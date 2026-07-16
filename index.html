@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORNATA Jewelry — Joyas que cuentan tu historia</title>
+<meta name="description" content="ORNATA Jewelry — Joyería artesanal premium. Anillos, collares, aretes y pulseras diseñados para brillar contigo. Venta online con envíos a todo el país.">
+<link rel="icon" type="image/jpeg" href="assets/ornata-logo.jpeg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --plum-950:#241621;
+  --plum-900:#2e1f2e;
+  --plum-800:#3d2b3d;
+  --plum-700:#4f3a4e;
+  --lilac:#b79fc4;
+  --lilac-soft:#cbb8d6;
+  --lilac-100:#ece4f1;
+  --ivory:#f6f3f8;
+  --ivory-warm:#faf8fb;
+  --gold:#c6a86b;
+  --gold-soft:#d8c39a;
+  --text:#2e1f2e;
+  --text-soft:#6a5b68;
+  --white:#ffffff;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Jost',sans-serif;
+  color:var(--text);
+  background:var(--ivory);
+  overflow-x:hidden;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.serif{font-family:'Cormorant Garamond',serif;font-weight:500;line-height:1.08;letter-spacing:.005em}
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+.container{width:min(1240px,92vw);margin-inline:auto}
+.eyebrow{
+  font-family:'Jost',sans-serif;font-weight:500;font-size:.72rem;letter-spacing:.42em;
+  text-transform:uppercase;color:var(--gold);display:inline-block;margin-bottom:1.1rem;
+}
+.eyebrow.light{color:var(--lilac)}
+.btn{
+  display:inline-flex;align-items:center;gap:.6em;font-family:'Jost',sans-serif;
+  font-weight:500;font-size:.82rem;letter-spacing:.18em;text-transform:uppercase;
+  padding:1.05em 2.4em;border-radius:100px;cursor:pointer;border:none;
+  transition:transform .5s var(--ease),box-shadow .5s var(--ease),background .5s var(--ease),color .5s var(--ease);
+  position:relative;overflow:hidden;
+}
+.btn-gold{background:linear-gradient(135deg,#d8c39a,#c6a86b);color:var(--plum-900);box-shadow:0 14px 34px -12px rgba(198,168,107,.7)}
+.btn-gold:hover{transform:translateY(-3px);box-shadow:0 22px 44px -12px rgba(198,168,107,.85)}
+.btn-outline{background:transparent;border:1px solid var(--lilac);color:var(--plum-900)}
+.btn-outline.light{border-color:rgba(255,255,255,.4);color:#fff}
+.btn-outline:hover{background:var(--plum-900);color:#fff;border-color:var(--plum-900);transform:translateY(-3px)}
+.btn-outline.light:hover{background:#fff;color:var(--plum-900);border-color:#fff}
+
+/* ---------- NAV ---------- */
+header.nav{
+  position:fixed;top:0;left:0;width:100%;z-index:100;
+  padding:1.5rem 0;transition:padding .5s var(--ease),background .5s var(--ease),box-shadow .5s var(--ease);
+}
+header.nav.scrolled{
+  padding:.7rem 0;background:rgba(246,243,248,.82);backdrop-filter:blur(18px);
+  box-shadow:0 1px 0 rgba(46,31,46,.06),0 20px 40px -30px rgba(46,31,46,.4);
+}
+.nav-inner{display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:.85rem}
+.brand img{width:52px;height:52px;border-radius:50%;object-fit:cover;transition:width .5s var(--ease),height .5s var(--ease);
+  box-shadow:0 6px 18px -8px rgba(46,31,46,.4)}
+header.nav.scrolled .brand img{width:44px;height:44px}
+.brand-name{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;letter-spacing:.14em;color:var(--plum-900)}
+.brand-name small{display:block;font-family:'Jost';font-size:.5rem;letter-spacing:.55em;color:var(--gold);margin-top:-2px;font-weight:500}
+.nav-links{display:flex;align-items:center;gap:2.4rem}
+.nav-links a{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;font-weight:400;color:var(--plum-800);position:relative;padding:.2rem 0}
+.nav-links a::after{content:"";position:absolute;left:0;bottom:-2px;width:0;height:1px;background:var(--gold);transition:width .4s var(--ease)}
+.nav-links a:hover::after{width:100%}
+.nav-cta{display:inline-flex;align-items:center;gap:.5em;font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;
+  border:1px solid var(--lilac);padding:.7em 1.5em;border-radius:100px;transition:all .4s var(--ease);color:var(--plum-900)}
+.nav-cta:hover{background:var(--plum-900);color:#fff;border-color:var(--plum-900)}
+.burger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:6px}
+.burger span{width:26px;height:2px;background:var(--plum-900);transition:.3s}
+
+/* ---------- HERO ---------- */
+.hero{
+  position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;
+  text-align:center;overflow:hidden;
+  background:linear-gradient(180deg,#f7f4f9 0%,#ece3f2 50%,#f7f4f9 100%);
+}
+/* drifting aurora blobs */
+.aurora{position:absolute;inset:-25%;z-index:0;pointer-events:none;filter:blur(70px)}
+.aurora b{position:absolute;border-radius:50%;mix-blend-mode:multiply;display:block}
+.aurora .a1{width:54vw;height:54vw;left:-8%;top:-12%;opacity:.55;background:radial-gradient(circle,#cdb6dd,transparent 68%);animation:drift1 18s ease-in-out infinite}
+.aurora .a2{width:46vw;height:46vw;right:-6%;top:4%;opacity:.42;background:radial-gradient(circle,#e6d3b3,transparent 66%);animation:drift2 23s ease-in-out infinite}
+.aurora .a3{width:52vw;height:52vw;left:22%;bottom:-20%;opacity:.5;background:radial-gradient(circle,#c4b6e2,transparent 68%);animation:drift3 20s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6%,4%) scale(1.14)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5%,6%) scale(1.1)}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(4%,-5%) scale(1.16)}}
+.hero-grain{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.72),transparent 48%)}
+.hero-content{position:relative;z-index:3;max-width:960px;padding:5rem 1rem 4rem;transition:opacity .3s linear}
+
+/* medallion */
+.medallion{position:relative;width:clamp(180px,22vw,268px);aspect-ratio:1;margin:0 auto 1.5rem;
+  display:flex;align-items:center;justify-content:center;animation:floaty 7s ease-in-out infinite}
+.medallion .halo{position:absolute;inset:-16%;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.95),rgba(214,195,154,.28) 52%,transparent 70%);filter:blur(4px)}
+.ring-orbit{position:absolute;inset:0;border-radius:50%;border:1px dashed rgba(155,126,172,.6);animation:spin 26s linear infinite}
+.ring-orbit.two{inset:8%;border-style:solid;border-color:rgba(198,168,107,.4);animation:spin 19s linear infinite reverse}
+.ring-orbit .dot{position:absolute;top:-5px;left:50%;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;
+  background:var(--gold);box-shadow:0 0 14px 3px rgba(198,168,107,.85)}
+.ring-orbit.two .dot{width:7px;height:7px;background:var(--lilac);box-shadow:0 0 12px 3px rgba(183,159,196,.85)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.medallion .logo{position:relative;z-index:2;width:74%;aspect-ratio:1;border-radius:50%;overflow:hidden;
+  box-shadow:0 28px 64px -24px rgba(90,60,90,.65),0 0 0 7px #fff,0 0 0 8px rgba(183,159,196,.4)}
+.medallion .logo img{width:100%;height:100%;object-fit:cover}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+
+.hero-eyebrow{display:flex;align-items:center;justify-content:center;gap:1rem;margin-bottom:1.3rem}
+.hero-eyebrow span{font-size:.72rem;letter-spacing:.42em;text-transform:uppercase;color:var(--gold);font-weight:500;white-space:nowrap}
+.hero-eyebrow i{width:clamp(24px,6vw,64px);height:1px;background:linear-gradient(90deg,transparent,var(--lilac));display:block}
+.hero-eyebrow i:last-child{background:linear-gradient(90deg,var(--lilac),transparent)}
+.hero h1{font-size:clamp(2.6rem,7vw,5.6rem);color:var(--plum-900);font-weight:500;letter-spacing:-.012em}
+.hero h1 .shine{font-style:italic;background:linear-gradient(100deg,#b79fc4 0%,#c6a86b 45%,#b79fc4 90%);
+  background-size:220% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  animation:shine 6s linear infinite}
+@keyframes shine{to{background-position:220% center}}
+.hero-sub{font-size:clamp(.98rem,1.5vw,1.18rem);color:var(--text-soft);max-width:580px;margin:1.2rem auto 1.9rem;font-weight:300;letter-spacing:.01em}
+.hero-cta{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+.hero-trust{display:flex;gap:clamp(1.2rem,3vw,2.4rem);justify-content:center;flex-wrap:wrap;margin-top:2rem}
+.hero-trust span{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--plum-700);display:inline-flex;align-items:center;gap:.5em;opacity:.9}
+.hero-trust span::before{content:"✦";color:var(--gold);font-size:.7em}
+.scroll-hint{position:absolute;bottom:2.2rem;left:50%;transform:translateX(-50%);z-index:4;
+  font-size:.62rem;letter-spacing:.4em;text-transform:uppercase;color:var(--text-soft);display:flex;flex-direction:column;align-items:center;gap:.7rem}
+.scroll-line{width:1px;height:46px;background:linear-gradient(var(--gold),transparent);position:relative;overflow:hidden}
+.scroll-line::after{content:"";position:absolute;top:-50%;left:0;width:100%;height:50%;background:var(--gold);animation:scrolldot 2s var(--ease) infinite}
+@keyframes scrolldot{0%{top:-50%}100%{top:100%}}
+/* sparkles */
+.spark{position:absolute;pointer-events:none;color:var(--lilac);opacity:0;animation:twinkle 4s ease-in-out infinite;z-index:2}
+@keyframes twinkle{0%,100%{opacity:0;transform:scale(.4)}50%{opacity:.9;transform:scale(1)}}
+
+/* ---------- MARQUEE ---------- */
+.marquee{background:var(--plum-900);color:var(--ivory);padding:1.15rem 0;overflow:hidden;white-space:nowrap;position:relative}
+.marquee-track{display:inline-flex;gap:3.5rem;animation:marquee 26s linear infinite;will-change:transform}
+.marquee:hover .marquee-track{animation-play-state:paused}
+.marquee span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.35rem;letter-spacing:.03em;display:inline-flex;align-items:center;gap:3.5rem;color:var(--lilac-100)}
+.marquee span::before{content:"✦";color:var(--gold);font-size:.8rem;font-style:normal}
+@keyframes marquee{to{transform:translateX(-50%)}}
+
+/* ---------- SECTION BASE ---------- */
+section{position:relative}
+.pad{padding:clamp(5rem,11vh,9rem) 0}
+.section-head{max-width:640px}
+.section-head.center{margin-inline:auto;text-align:center}
+h2.display{font-size:clamp(2.4rem,5.5vw,4.2rem);color:var(--plum-900);margin-bottom:1.1rem}
+.lead{font-size:1.08rem;color:var(--text-soft);font-weight:300}
+
+/* reveal animation */
+.reveal{opacity:0;transform:translateY(38px);transition:opacity 1s var(--ease),transform 1s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+.reveal.d1{transition-delay:.08s}.reveal.d2{transition-delay:.16s}.reveal.d3{transition-delay:.24s}
+.reveal.d4{transition-delay:.32s}.reveal.d5{transition-delay:.4s}.reveal.d6{transition-delay:.48s}
+
+/* ---------- ABOUT ---------- */
+.about{background:var(--ivory-warm)}
+.about-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:5rem;align-items:center}
+.about-visual{position:relative;aspect-ratio:4/5;border-radius:8px;overflow:hidden;
+  background:radial-gradient(circle at 50% 35%,#efe6f3,#e2d4ea);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 40px 80px -50px rgba(90,60,90,.6)}
+.about-visual .ring-illu{width:62%;color:var(--lilac);opacity:.9}
+.ph-note{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:.6rem;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--plum-700);background:rgba(255,255,255,.7);padding:.4em 1em;border-radius:100px;white-space:nowrap}
+.about-text p{margin-bottom:1.2rem;color:var(--text-soft)}
+.about-sign{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.6rem;color:var(--plum-800);margin-top:.5rem}
+.stat-row{display:flex;gap:2.6rem;margin-top:2.4rem;flex-wrap:wrap}
+.stat b{font-family:'Cormorant Garamond',serif;font-size:2.8rem;color:var(--plum-900);display:block;line-height:1}
+.stat small{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+
+/* ---------- COLECCIONES (dark) ---------- */
+.collections{background:linear-gradient(180deg,var(--plum-950),var(--plum-900));color:var(--ivory);overflow:hidden}
+.collections .eyebrow{color:var(--gold-soft)}
+.collections h2{color:#fff}
+.collections .lead{color:var(--lilac-soft)}
+.coll-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.4rem;margin-top:3.4rem}
+.coll-card{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:3/4;cursor:pointer;
+  background:linear-gradient(160deg,#3d2b3d,#4f3a4e);display:flex;flex-direction:column;justify-content:flex-end;
+  padding:1.8rem;border:1px solid rgba(183,159,196,.18);transition:transform .7s var(--ease),box-shadow .7s var(--ease),border-color .7s var(--ease)}
+.coll-card:hover{transform:translateY(-10px);box-shadow:0 40px 70px -40px rgba(0,0,0,.7);border-color:rgba(198,168,107,.5)}
+.coll-icon{position:absolute;top:0;left:0;width:100%;height:60%;display:flex;align-items:center;justify-content:center;color:var(--lilac);opacity:.55;transition:.7s var(--ease)}
+.coll-card:hover .coll-icon{opacity:.9;transform:scale(1.08) translateY(-6px)}
+.coll-icon svg{width:44%}
+.coll-card h3{font-size:1.7rem;color:#fff;position:relative;z-index:2}
+.coll-card p{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-soft);position:relative;z-index:2;margin-top:.2rem}
+.coll-card .arrow{position:absolute;top:1.4rem;right:1.4rem;width:34px;height:34px;border-radius:50%;
+  border:1px solid rgba(183,159,196,.4);display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:translateY(6px);transition:.5s var(--ease);color:var(--gold-soft)}
+.coll-card:hover .arrow{opacity:1;transform:none}
+
+/* ---------- PRODUCTOS ---------- */
+.products{background:var(--ivory)}
+.prod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:3.4rem}
+.prod-card{background:#fff;border-radius:10px;overflow:hidden;transition:transform .6s var(--ease),box-shadow .6s var(--ease);
+  box-shadow:0 20px 50px -40px rgba(90,60,90,.5)}
+.prod-card:hover{transform:translateY(-8px);box-shadow:0 40px 70px -40px rgba(90,60,90,.55)}
+.prod-media{position:relative;aspect-ratio:1;background:linear-gradient(150deg,#efe6f3,#e4d6ec);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.prod-media svg{width:46%;color:var(--lilac);transition:transform .8s var(--ease)}
+.prod-card:hover .prod-media svg{transform:scale(1.1) rotate(-3deg)}
+.prod-media .tag{position:absolute;top:14px;left:14px;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;
+  background:var(--plum-900);color:var(--gold-soft);padding:.4em .9em;border-radius:100px}
+.prod-media .ph{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:.55rem;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--plum-700);background:rgba(255,255,255,.72);padding:.35em .9em;border-radius:100px;white-space:nowrap}
+.prod-body{padding:1.5rem 1.6rem 1.8rem}
+.prod-body h3{font-size:1.5rem;color:var(--plum-900)}
+.prod-body .cat{font-size:.66rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:.3rem}
+.prod-foot{display:flex;align-items:center;justify-content:space-between;margin-top:1rem}
+.price{font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--plum-900)}
+.price small{font-size:.7rem;color:var(--text-soft);font-family:'Jost'}
+.prod-buy{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--plum-800);border-bottom:1px solid var(--gold);padding-bottom:2px;transition:.4s}
+.prod-buy:hover{color:var(--gold)}
+.products-cta{text-align:center;margin-top:3.6rem}
+
+/* ---------- FEATURES ---------- */
+.features{background:linear-gradient(180deg,#efe8f3,#f6f3f8)}
+.feat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.6rem;margin-top:3.4rem}
+.feat{background:#fff;border-radius:10px;padding:2.4rem 1.8rem;text-align:center;transition:transform .5s var(--ease),box-shadow .5s var(--ease);
+  box-shadow:0 20px 50px -44px rgba(90,60,90,.5)}
+.feat:hover{transform:translateY(-8px);box-shadow:0 34px 60px -44px rgba(90,60,90,.55)}
+.feat-ic{width:58px;height:58px;margin:0 auto 1.3rem;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#efe6f3,#e2d4ea);color:var(--plum-800)}
+.feat h3{font-size:1.35rem;color:var(--plum-900);margin-bottom:.4rem}
+.feat p{font-size:.9rem;color:var(--text-soft)}
+
+/* ---------- PROCESO ---------- */
+.process{background:var(--ivory-warm)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:2.4rem;margin-top:3.4rem}
+.step{position:relative;padding-top:2rem}
+.step-num{font-family:'Cormorant Garamond',serif;font-size:4.5rem;color:var(--lilac);opacity:.55;line-height:.7}
+.step h3{font-size:1.5rem;color:var(--plum-900);margin:.6rem 0 .5rem}
+.step p{color:var(--text-soft);font-size:.95rem}
+
+/* ---------- CTA FINAL ---------- */
+.cta-final{background:linear-gradient(140deg,var(--plum-950),var(--plum-800));color:#fff;text-align:center;overflow:hidden;position:relative}
+.cta-final::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(198,168,107,.22),transparent 55%)}
+.cta-final .inner{position:relative;z-index:2}
+.cta-final h2{color:#fff;font-size:clamp(2.6rem,6vw,4.6rem);margin-bottom:1rem}
+.cta-final p{color:var(--lilac-soft);max-width:520px;margin:0 auto 2.6rem;font-weight:300}
+.cta-final .btn-gold{margin:0 .5rem .8rem}
+
+/* ---------- CONTACT / FOOTER ---------- */
+footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
+.foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1.2fr;gap:3rem;padding-bottom:3.5rem;border-bottom:1px solid rgba(183,159,196,.16)}
+.foot-brand img{width:70px;height:70px;border-radius:50%;margin-bottom:1.2rem;box-shadow:0 0 0 1px rgba(183,159,196,.3)}
+.foot-brand p{font-size:.9rem;font-weight:300;max-width:280px}
+.foot-col h4{font-family:'Jost';font-size:.72rem;letter-spacing:.26em;text-transform:uppercase;color:var(--gold-soft);margin-bottom:1.3rem}
+.foot-col a,.foot-col p{display:block;font-size:.92rem;color:var(--lilac-soft);margin-bottom:.7rem;font-weight:300;transition:color .3s}
+.foot-col a:hover{color:#fff}
+.socials{display:flex;gap:.8rem;margin-top:.4rem}
+.socials a{width:40px;height:40px;border-radius:50%;border:1px solid rgba(183,159,196,.3);display:flex;align-items:center;justify-content:center;transition:.4s}
+.socials a:hover{background:var(--gold);color:var(--plum-900);border-color:var(--gold);transform:translateY(-3px)}
+.foot-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:2rem;font-size:.78rem;color:#8a7a88;flex-wrap:wrap;gap:1rem}
+.foot-note{font-size:.72rem;color:#7a6b78;background:rgba(183,159,196,.08);border:1px dashed rgba(183,159,196,.25);
+  border-radius:8px;padding:1rem 1.3rem;margin-top:2rem}
+
+/* WhatsApp float */
+.wa-float{position:fixed;bottom:24px;right:24px;z-index:90;width:60px;height:60px;border-radius:50%;
+  background:linear-gradient(135deg,#25d366,#128c7e);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 16px 34px -12px rgba(18,140,126,.7);transition:transform .4s var(--ease);color:#fff}
+.wa-float:hover{transform:scale(1.1)}
+.wa-float::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid #25d366;animation:pulse 2.4s ease-out infinite}
+@keyframes pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.7);opacity:0}}
+
+/* progress bar */
+.progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:200;background:linear-gradient(90deg,var(--lilac),var(--gold))}
+
+/* ---------- CART BUTTON (nav) ---------- */
+.cart-btn{position:relative;background:none;border:none;cursor:pointer;color:var(--plum-900);
+  display:inline-flex;align-items:center;justify-content:center;padding:.4rem;margin-left:.4rem;transition:transform .3s}
+.cart-btn:hover{transform:translateY(-2px)}
+.cart-count{position:absolute;top:-4px;right:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:100px;
+  background:var(--gold);color:var(--plum-900);font-family:'Jost';font-size:.62rem;font-weight:600;
+  display:flex;align-items:center;justify-content:center;line-height:1;transform:scale(0);transition:transform .35s var(--ease)}
+.cart-count.show{transform:scale(1)}
+
+/* ---------- FILTERS ---------- */
+.prod-filters{display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin:2.6rem 0 3rem}
+.filter-chip{font-family:'Jost';font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+  padding:.72em 1.5em;border-radius:100px;border:1px solid var(--lilac-soft);background:transparent;color:var(--plum-800);
+  transition:all .4s var(--ease)}
+.filter-chip:hover{border-color:var(--gold)}
+.filter-chip.active{background:var(--plum-900);color:#fff;border-color:var(--plum-900)}
+.prod-empty{text-align:center;color:var(--text-soft);margin-top:2rem}
+
+/* product cards get real images */
+.prod-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .8s var(--ease)}
+.prod-card:hover .prod-media img{transform:scale(1.06)}
+.prod-media .ph-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;color:var(--lilac);
+  background:linear-gradient(150deg,#efe6f3,#e4d6ec)}
+.prod-media .ph-fallback svg{width:40%;position:static}
+.prod-media .ph-fallback small{font-size:.54rem;letter-spacing:.22em;text-transform:uppercase;color:var(--plum-700);opacity:.75}
+.prod-add{width:100%;margin-top:1rem;border:none;cursor:pointer;background:var(--plum-900);color:#fff;
+  font-family:'Jost';font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;padding:.95em 1em;border-radius:100px;
+  transition:all .4s var(--ease);display:inline-flex;align-items:center;justify-content:center;gap:.5em}
+.prod-add:hover{background:linear-gradient(135deg,#d8c39a,#c6a86b);color:var(--plum-900)}
+.prod-add.added{background:#4f8a5b;color:#fff}
+.prod-foot{align-items:baseline}
+
+/* ---------- CART DRAWER ---------- */
+.overlay{position:fixed;inset:0;background:rgba(36,22,33,.55);backdrop-filter:blur(3px);opacity:0;visibility:hidden;
+  transition:opacity .4s var(--ease),visibility .4s;z-index:150}
+.overlay.open{opacity:1;visibility:visible}
+.cart-drawer{position:fixed;top:0;right:-460px;width:min(420px,92vw);height:100%;background:var(--ivory-warm);z-index:160;
+  display:flex;flex-direction:column;transition:right .5s var(--ease);box-shadow:-30px 0 80px -40px rgba(46,31,46,.6)}
+.cart-drawer.open{right:0}
+.cart-head{display:flex;align-items:center;justify-content:space-between;padding:1.6rem 1.6rem 1.2rem;border-bottom:1px solid rgba(183,159,196,.25)}
+.cart-head h3{font-size:1.6rem;color:var(--plum-900)}
+.cart-close{background:none;border:none;font-size:1.6rem;cursor:pointer;color:var(--plum-700);line-height:1;transition:transform .3s}
+.cart-close:hover{transform:rotate(90deg)}
+.cart-items{flex:1;overflow-y:auto;padding:1.2rem 1.6rem}
+.cart-empty{text-align:center;color:var(--text-soft);margin-top:3rem;font-weight:300}
+.cart-item{display:flex;gap:1rem;padding:1rem 0;border-bottom:1px solid rgba(183,159,196,.18)}
+.cart-item .thumb{width:66px;height:66px;border-radius:8px;overflow:hidden;flex-shrink:0;background:linear-gradient(150deg,#efe6f3,#e4d6ec);display:flex;align-items:center;justify-content:center}
+.cart-item .thumb img{width:100%;height:100%;object-fit:cover}
+.cart-item .thumb svg{width:44%;color:var(--lilac)}
+.cart-item .ci-info{flex:1;min-width:0}
+.cart-item h4{font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--plum-900);font-weight:600;line-height:1.1}
+.cart-item .ci-cat{font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin:.2rem 0 .4rem}
+.cart-item .ci-price{font-family:'Jost';font-size:.9rem;color:var(--plum-800)}
+.qty{display:inline-flex;align-items:center;gap:.6rem;margin-top:.5rem}
+.qty button{width:24px;height:24px;border-radius:50%;border:1px solid var(--lilac);background:#fff;cursor:pointer;color:var(--plum-800);font-size:.9rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:.3s}
+.qty button:hover{background:var(--plum-900);color:#fff;border-color:var(--plum-900)}
+.qty span{font-size:.85rem;min-width:18px;text-align:center}
+.ci-remove{background:none;border:none;cursor:pointer;color:#b98;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;align-self:flex-start;margin-top:.3rem;transition:.3s}
+.ci-remove:hover{color:#c0392b}
+.cart-foot{padding:1.4rem 1.6rem 1.8rem;border-top:1px solid rgba(183,159,196,.25);background:#fff}
+.cart-total{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1rem}
+.cart-total span{font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-soft)}
+.cart-total b{font-family:'Cormorant Garamond',serif;font-size:2rem;color:var(--plum-900)}
+.cart-note{font-size:.68rem;color:var(--text-soft);text-align:center;margin-top:.7rem}
+.btn-full{width:100%;justify-content:center}
+
+/* ---------- CHECKOUT MODAL ---------- */
+.modal{position:fixed;inset:0;z-index:170;display:flex;align-items:center;justify-content:center;padding:1.2rem;
+  opacity:0;visibility:hidden;transition:opacity .4s var(--ease),visibility .4s}
+.modal.open{opacity:1;visibility:visible}
+.modal-card{background:var(--ivory-warm);width:min(560px,96vw);max-height:92vh;overflow-y:auto;border-radius:14px;
+  padding:2.2rem;box-shadow:0 40px 100px -30px rgba(46,31,46,.6);transform:translateY(24px) scale(.98);transition:transform .5s var(--ease)}
+.modal.open .modal-card{transform:none}
+.modal-card h3{font-size:2rem;color:var(--plum-900);margin-bottom:.3rem}
+.modal-card .sub{color:var(--text-soft);font-size:.92rem;margin-bottom:1.6rem}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--plum-700);margin-bottom:.4rem}
+.field input,.field textarea{width:100%;font-family:'Jost';font-size:.95rem;padding:.85em 1em;border-radius:8px;
+  border:1px solid var(--lilac-soft);background:#fff;color:var(--plum-900);transition:border .3s}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--gold)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.pay-methods{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.7rem;margin:.4rem 0 1.2rem}
+.pay-opt{border:1px solid var(--lilac-soft);border-radius:10px;padding:.9rem .6rem;text-align:center;cursor:pointer;transition:all .35s var(--ease);background:#fff}
+.pay-opt:hover{border-color:var(--gold)}
+.pay-opt.active{border-color:var(--plum-900);box-shadow:0 0 0 1px var(--plum-900);background:#fff}
+.pay-opt .pi{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--plum-900);font-weight:600;display:block}
+.pay-opt small{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-soft)}
+.pay-detail{background:#fff;border:1px dashed var(--lilac);border-radius:10px;padding:1.1rem 1.2rem;margin-bottom:1.2rem;font-size:.9rem;color:var(--plum-800)}
+.pay-detail b{color:var(--plum-900)}
+.pay-detail .big{font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--plum-900);letter-spacing:.05em}
+.modal-summary{background:rgba(183,159,196,.1);border-radius:10px;padding:1rem 1.2rem;margin-bottom:1.4rem;font-size:.88rem}
+.modal-summary .row{display:flex;justify-content:space-between;padding:.2rem 0;color:var(--plum-800)}
+.modal-summary .tot{border-top:1px solid rgba(183,159,196,.4);margin-top:.5rem;padding-top:.6rem;font-weight:600;color:var(--plum-900)}
+.modal-close{position:sticky;top:0;float:right;background:none;border:none;font-size:1.6rem;cursor:pointer;color:var(--plum-700);line-height:1;margin:-.6rem -.4rem 0 0}
+
+/* ---------- RESPONSIVE ---------- */
+@media(max-width:960px){
+  .about-grid{grid-template-columns:1fr;gap:3rem}
+  .coll-grid{grid-template-columns:repeat(2,1fr)}
+  .prod-grid{grid-template-columns:repeat(2,1fr)}
+  .feat-grid{grid-template-columns:repeat(2,1fr)}
+  .steps{grid-template-columns:1fr;gap:1.6rem}
+  .foot-grid{grid-template-columns:1fr 1fr;gap:2rem}
+}
+@media(max-width:680px){
+  .nav-links{position:fixed;top:0;right:-100%;height:100vh;width:74%;background:var(--ivory);
+    flex-direction:column;justify-content:center;gap:2rem;padding:3rem;transition:right .5s var(--ease);
+    box-shadow:-20px 0 60px -30px rgba(46,31,46,.5);z-index:99}
+  .nav-links.open{right:0}
+  .nav-links .nav-cta{margin-top:1rem}
+  .burger{display:flex;z-index:100}
+  .prod-grid{grid-template-columns:1fr}
+  .coll-grid{grid-template-columns:1fr 1fr;gap:1rem}
+  .feat-grid{grid-template-columns:1fr}
+  .foot-grid{grid-template-columns:1fr}
+  .stat-row{gap:1.8rem}
+  .hero-cta{flex-direction:column;align-items:center}
+  .hero-cta .btn{width:min(320px,80vw);justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<!-- ===== NAV ===== -->
+<header class="nav" id="nav">
+  <div class="container nav-inner">
+    <a href="#top" class="brand">
+      <img src="assets/ornata-logo.jpeg" alt="ORNATA Jewelry">
+      <span class="brand-name">ORNATA<small>JEWELRY</small></span>
+    </a>
+    <nav class="nav-links" id="navLinks">
+      <a href="#colecciones">Colecciones</a>
+      <a href="#destacados">Destacados</a>
+      <a href="#nosotros">Nosotros</a>
+      <a href="#proceso">Cómo comprar</a>
+      <a href="#contacto" class="nav-cta">Contáctanos</a>
+    </nav>
+    <button class="cart-btn" id="cartBtn" aria-label="Ver carrito">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h2l1.5 11h10L20 8H7"/><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
+      <span class="cart-count" id="cartCount">0</span>
+    </button>
+    <button class="burger" id="burger" aria-label="Menú"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<section class="hero" id="top">
+  <div class="aurora"><b class="a1"></b><b class="a2"></b><b class="a3"></b></div>
+  <div class="hero-grain"></div>
+  <div class="spark" style="top:20%;left:14%;font-size:1.4rem;animation-delay:.2s">✦</div>
+  <div class="spark" style="top:26%;right:16%;font-size:1rem;animation-delay:1.1s">✦</div>
+  <div class="spark" style="top:64%;left:20%;font-size:.85rem;animation-delay:2s">✦</div>
+  <div class="spark" style="top:70%;right:20%;font-size:1.2rem;animation-delay:.7s">✦</div>
+  <div class="spark" style="top:14%;left:50%;font-size:.7rem;animation-delay:1.6s">✦</div>
+  <div class="hero-content">
+    <div class="medallion">
+      <div class="halo"></div>
+      <div class="ring-orbit"><span class="dot"></span></div>
+      <div class="ring-orbit two"><span class="dot"></span></div>
+      <div class="logo"><img src="assets/ornata-logo.jpeg" alt="ORNATA Jewelry logo"></div>
+    </div>
+    <div class="hero-eyebrow"><i></i><span>Joyería artesanal · Piezas únicas</span><i></i></div>
+    <h1>Joyas que cuentan<br><span class="shine">tu historia</span></h1>
+    <p class="hero-sub">Diseños atemporales creados para acompañarte en cada momento. Descubre la colección ORNATA y encuentra la pieza que brilla contigo.</p>
+    <div class="hero-cta">
+      <a href="#destacados" class="btn btn-gold">Ver catálogo ✦</a>
+      <a href="#nosotros" class="btn btn-outline">Nuestra historia</a>
+    </div>
+    <div class="hero-trust">
+      <span>Envíos a todo el país</span>
+      <span>Hecho a mano</span>
+      <span>Atención por WhatsApp</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== MARQUEE ===== -->
+<div class="marquee">
+  <div class="marquee-track">
+    <span>Envíos a todo el país</span><span>Joyería artesanal</span><span>Garantía de por vida</span><span>Packaging de regalo</span>
+    <span>Envíos a todo el país</span><span>Joyería artesanal</span><span>Garantía de por vida</span><span>Packaging de regalo</span>
+  </div>
+</div>
+
+<!-- ===== NOSOTROS ===== -->
+<section class="about pad" id="nosotros">
+  <div class="container about-grid">
+    <div class="about-visual reveal">
+      <svg class="ring-illu" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="1.4">
+        <circle cx="100" cy="120" r="52"/>
+        <circle cx="100" cy="120" r="42" stroke-dasharray="2 5"/>
+        <path d="M78 70 L100 42 L122 70 L112 82 L88 82 Z"/>
+        <path d="M88 82 L100 70 L112 82 M100 42 L100 70"/>
+      </svg>
+      <span class="ph-note">◇ Reemplaza con foto de tu taller / producto</span>
+    </div>
+    <div class="about-text">
+      <span class="eyebrow reveal">Nuestra esencia</span>
+      <h2 class="display reveal d1">Belleza que perdura</h2>
+      <p class="reveal d2">En ORNATA creemos que una joya es mucho más que un accesorio: es un recuerdo, un símbolo, una forma de expresar quién eres. Por eso cada pieza está pensada al detalle, para acompañarte hoy y durante muchos años.</p>
+      <p class="reveal d3">Trabajamos con materiales seleccionados y acabados cuidados, combinando el diseño contemporáneo con la calidez de lo hecho a mano. Elegancia sencilla, para el día a día y para las ocasiones que importan.</p>
+      <p class="about-sign reveal d4">— El equipo de ORNATA</p>
+      <div class="stat-row reveal d5">
+        <div class="stat"><b data-count="100">0</b><small>Diseños únicos</small></div>
+        <div class="stat"><b data-count="24">0</b><small>Horas de envío*</small></div>
+        <div class="stat"><b data-count="100" data-suffix="%">0</b><small>Hecho con amor</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== COLECCIONES ===== -->
+<section class="collections pad" id="colecciones">
+  <div class="container">
+    <div class="section-head center">
+      <span class="eyebrow reveal">Explora por categoría</span>
+      <h2 class="display reveal d1">Nuestras colecciones</h2>
+      <p class="lead reveal d2">Cada colección tiene su propio carácter. Encuentra la que habla tu idioma.</p>
+    </div>
+    <div class="coll-grid">
+      <div class="coll-card reveal d1">
+        <span class="arrow">→</span>
+        <div class="coll-icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="50" cy="62" r="26"/><path d="M38 34 L50 20 L62 34 L56 42 L44 42 Z"/><path d="M44 42 L50 34 L56 42"/></svg></div>
+        <h3>Anillos</h3><p>Compromiso &amp; diario</p>
+      </div>
+      <div class="coll-card reveal d2">
+        <span class="arrow">→</span>
+        <div class="coll-icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M28 28 Q50 62 72 28"/><circle cx="50" cy="66" r="9"/><path d="M50 57 L50 48"/></svg></div>
+        <h3>Collares</h3><p>Gargantillas &amp; dijes</p>
+      </div>
+      <div class="coll-card reveal d3">
+        <span class="arrow">→</span>
+        <div class="coll-icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="36" cy="40" r="5"/><path d="M36 45 L30 66 L42 66 Z"/><circle cx="64" cy="40" r="5"/><path d="M64 45 L58 66 L70 66 Z"/></svg></div>
+        <h3>Aretes</h3><p>Studs &amp; colgantes</p>
+      </div>
+      <div class="coll-card reveal d4">
+        <span class="arrow">→</span>
+        <div class="coll-icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="50" cy="50" rx="30" ry="22"/><ellipse cx="50" cy="50" rx="30" ry="22" stroke-dasharray="3 6"/><rect x="44" y="22" width="12" height="9" rx="2"/></svg></div>
+        <h3>Pulseras</h3><p>Charms &amp; minimal</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CATÁLOGO ===== -->
+<section class="products pad" id="destacados">
+  <div class="container">
+    <div class="section-head center">
+      <span class="eyebrow reveal">Nuestra colección</span>
+      <h2 class="display reveal d1">Catálogo ORNATA</h2>
+      <p class="lead reveal d2">Descubre todas nuestras piezas. Añade tus favoritas al carrito y finaliza tu compra de forma segura.</p>
+    </div>
+    <div class="prod-filters reveal d2" id="prodFilters"></div>
+    <div class="prod-grid" id="prodGrid"></div>
+    <p class="prod-empty" id="prodEmpty" hidden>No hay productos en esta categoría todavía.</p>
+  </div>
+</section>
+
+<!-- ===== FEATURES ===== -->
+<section class="features pad">
+  <div class="container">
+    <div class="section-head center">
+      <span class="eyebrow reveal">La experiencia ORNATA</span>
+      <h2 class="display reveal d1">Por qué elegirnos</h2>
+    </div>
+    <div class="feat-grid">
+      <div class="feat reveal d1">
+        <div class="feat-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L15 9 L22 9.5 L16.5 14 L18.5 21 L12 17 L5.5 21 L7.5 14 L2 9.5 L9 9 Z"/></svg></div>
+        <h3>Calidad artesanal</h3><p>Piezas cuidadas al detalle, hechas para durar y acompañarte cada día.</p>
+      </div>
+      <div class="feat reveal d2">
+        <div class="feat-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="14" height="10" rx="1"/><path d="M16 10 H20 L22 13 V17 H16"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></div>
+        <h3>Envío rápido</h3><p>Enviamos a todo el país con seguimiento. Empaque seguro y listo para regalar.</p>
+      </div>
+      <div class="feat reveal d3">
+        <div class="feat-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L20 5 V11 C20 16 16 20 12 22 C8 20 4 16 4 11 V5 Z"/><path d="M9 12 l2 2 l4 -4"/></svg></div>
+        <h3>Garantía real</h3><p>Respaldamos cada pieza. Si algo no está perfecto, lo resolvemos contigo.</p>
+      </div>
+      <div class="feat reveal d4">
+        <div class="feat-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="8" width="18" height="13" rx="1"/><path d="M3 8 L12 3 L21 8 M12 3 V21 M3 12 H21"/></svg></div>
+        <h3>Packaging premium</h3><p>Cada compra llega en un estuche elegante, pensado para sorprender.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PROCESO ===== -->
+<section class="process pad" id="proceso">
+  <div class="container">
+    <div class="section-head center">
+      <span class="eyebrow reveal">Comprar es muy fácil</span>
+      <h2 class="display reveal d1">Cómo comprar</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal d1"><div class="step-num">01</div><h3>Elige tu joya</h3><p>Explora las colecciones y guarda tus piezas favoritas. ¿Dudas? Escríbenos.</p></div>
+      <div class="step reveal d2"><div class="step-num">02</div><h3>Escríbenos</h3><p>Confirma tu pedido por WhatsApp o Instagram. Te asesoramos con talla y detalles.</p></div>
+      <div class="step reveal d3"><div class="step-num">03</div><h3>Recíbela en casa</h3><p>Preparamos tu pedido con cariño y lo enviamos a tu puerta, listo para lucir.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CTA FINAL ===== -->
+<section class="cta-final pad" id="contacto">
+  <div class="container inner">
+    <span class="eyebrow light reveal">¿Lista para brillar?</span>
+    <h2 class="reveal d1">Encuentra tu joya ORNATA</h2>
+    <p class="reveal d2">Explora el catálogo, arma tu pedido y págalo de forma segura. También puedes seguirnos para ver las novedades.</p>
+    <div class="reveal d3">
+      <a href="#destacados" class="btn btn-gold">Ver catálogo ✦</a>
+      <a href="https://www.instagram.com/ornatajewelrype" class="btn btn-outline light" target="_blank" rel="noopener">Síguenos en Instagram</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CART + CHECKOUT ===== -->
+<div class="overlay" id="overlay"></div>
+
+<aside class="cart-drawer" id="cartDrawer" aria-label="Carrito de compra">
+  <div class="cart-head">
+    <h3>Tu carrito</h3>
+    <button class="cart-close" id="cartClose" aria-label="Cerrar">&times;</button>
+  </div>
+  <div class="cart-items" id="cartItems"></div>
+  <div class="cart-foot">
+    <div class="cart-total"><span>Total</span><b id="cartTotal">S/ 0.00</b></div>
+    <button class="btn btn-gold btn-full" id="checkoutBtn">Finalizar compra ✦</button>
+    <p class="cart-note">Pago seguro · Envíos a todo el país</p>
+  </div>
+</aside>
+
+<div class="modal" id="checkoutModal" aria-label="Finalizar compra">
+  <div class="modal-card">
+    <button class="modal-close" id="modalClose" aria-label="Cerrar">&times;</button>
+    <h3>Finalizar compra</h3>
+    <p class="sub">Completa tus datos y elige cómo pagar. Confirmamos tu pedido al instante.</p>
+
+    <div class="modal-summary" id="modalSummary"></div>
+
+    <div class="field"><label>Nombre completo</label><input type="text" id="ckName" placeholder="Tu nombre"></div>
+    <div class="field-row">
+      <div class="field"><label>Teléfono</label><input type="tel" id="ckPhone" placeholder="Ej: 999 888 777"></div>
+      <div class="field"><label>Ciudad</label><input type="text" id="ckCity" placeholder="Tu ciudad"></div>
+    </div>
+    <div class="field"><label>Dirección de envío</label><input type="text" id="ckAddr" placeholder="Calle, número, referencia"></div>
+
+    <label style="display:block;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--plum-700);margin-bottom:.4rem">Método de pago</label>
+    <div class="pay-methods" id="payMethods">
+      <div class="pay-opt active" data-pay="yape"><span class="pi">Yape / Plin</span><small>QR o número</small></div>
+      <div class="pay-opt" data-pay="transfer"><span class="pi">Transferencia</span><small>Banco / CCI</small></div>
+      <div class="pay-opt" data-pay="card"><span class="pi">Tarjeta</span><small>Débito / crédito</small></div>
+    </div>
+    <div class="pay-detail" id="payDetail"></div>
+
+    <button class="btn btn-gold btn-full" id="placeOrderBtn">Confirmar pedido ✦</button>
+    <p class="cart-note" style="margin-top:.9rem">Al confirmar, se prepara tu pedido y recibimos tu comprobante.</p>
+  </div>
+</div>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="container">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <img src="assets/ornata-logo.jpeg" alt="ORNATA Jewelry">
+        <p>Joyería artesanal premium. Diseños atemporales creados para acompañarte en cada historia.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Tienda</h4>
+        <a href="#colecciones">Anillos</a>
+        <a href="#colecciones">Collares</a>
+        <a href="#colecciones">Aretes</a>
+        <a href="#colecciones">Pulseras</a>
+      </div>
+      <div class="foot-col">
+        <h4>Ayuda</h4>
+        <a href="#proceso">Cómo comprar</a>
+        <a href="#contacto">Envíos</a>
+        <a href="#contacto">Garantía</a>
+        <a href="#contacto">Contacto</a>
+      </div>
+      <div class="foot-col">
+        <h4>Escríbenos</h4>
+        <p>WhatsApp: +51 962 735 650</p>
+        <a href="https://www.instagram.com/ornatajewelrype" target="_blank" rel="noopener">@ornatajewelrype</a>
+        <a href="admin.html">⚙ Panel de administración</a>
+        <p>◇ Tu correo / ciudad (opcional)</p>
+        <div class="socials">
+          <a href="https://www.instagram.com/ornatajewelrype" target="_blank" rel="noopener" aria-label="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-note">◇ <strong>Nota:</strong> las fotos y precios se administran desde el <a href="admin.html" style="color:var(--gold-soft)">Panel de administración</a>. Sube tus imágenes, pon los precios reales y edita los nombres cuando quieras.</div>
+    <div class="foot-bottom">
+      <span>© 2026 ORNATA Jewelry. Todas las piezas, con amor.</span>
+      <span>Diseño premium con animaciones de scroll</span>
+    </div>
+  </div>
+</footer>
+
+<a href="https://wa.me/51962735650?text=Hola%20ORNATA" class="wa-float" target="_blank" rel="noopener" aria-label="WhatsApp">
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2zm0 2a8 8 0 0 1 0 16 8 8 0 0 1-4.1-1.1l-.3-.2-2.5.7.7-2.4-.2-.3A8 8 0 0 1 12 4zm-2.5 4.3c-.2 0-.5.1-.7.4-.3.3-1 1-1 2.3s1 2.7 1.2 2.9c.1.2 2 3 4.8 4.2 2.4 1 2.9.8 3.4.8.5-.1 1.6-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.1-.3-.2-.6-.4l-2-1c-.3-.1-.5-.1-.7.1l-.7.9c-.1.2-.3.2-.5.1-.7-.3-1.5-.6-2.4-1.6-.7-.7-1.2-1.6-1.3-1.8-.1-.3 0-.4.1-.5l.5-.6c.2-.2.2-.3.3-.5s0-.4 0-.5l-.9-2.1c-.2-.5-.4-.4-.6-.4h-.4z"/></svg>
+</a>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="firebase-store.js"></script>
+<script src="data/productos.js"></script>
+<script>
+const nav=document.getElementById('nav'),progress=document.getElementById('progress');
+function onScroll(){
+  const y=window.scrollY;
+  nav.classList.toggle('scrolled',y>40);
+  const h=document.documentElement.scrollHeight-window.innerHeight;
+  progress.style.width=(h>0?(y/h*100):0)+'%';
+}
+window.addEventListener('scroll',onScroll,{passive:true});onScroll();
+
+const burger=document.getElementById('burger'),links=document.getElementById('navLinks');
+burger.addEventListener('click',()=>links.classList.toggle('open'));
+links.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>links.classList.remove('open')));
+
+const io=new IntersectionObserver((es)=>{
+  es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}});
+},{threshold:.14,rootMargin:'0px 0px -8% 0px'});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+const counters=document.querySelectorAll('[data-count]');
+const cio=new IntersectionObserver((es)=>{
+  es.forEach(e=>{
+    if(!e.isIntersecting)return;
+    const el=e.target,target=+el.dataset.count,suf=el.dataset.suffix||'';
+    let n=0;const step=Math.max(1,target/60);
+    const t=setInterval(()=>{n+=step;if(n>=target){n=target;clearInterval(t)}el.textContent=Math.floor(n)+suf},20);
+    cio.unobserve(el);
+  });
+},{threshold:.6});
+counters.forEach(c=>cio.observe(c));
+
+// (efecto de desvanecido de la portada eliminado a pedido — se veía borroso al bajar)
+
+/* =====================================================
+   TIENDA ORNATA — catálogo, carrito y pago
+   ===================================================== */
+let _cfgLS={};try{_cfgLS=JSON.parse(localStorage.getItem('ornata_config')||'{}');}catch(e){}
+const CFG = Object.assign({whatsapp:"51962735650",moneda:"S/",yape:"962 735 650",titular:"ORNATA Jewelry",banco:"",cci:""}, window.ORNATA_CONFIG||{}, _cfgLS);
+const catIcon = {
+  Aretes:'<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="36" cy="34" r="6"/><path d="M36 40 L28 70 L44 70 Z"/><circle cx="64" cy="34" r="6"/><path d="M64 40 L56 70 L72 70 Z"/></svg>',
+  Pulseras:'<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="50" cy="50" rx="30" ry="22"/><rect x="44" y="22" width="12" height="9" rx="2"/></svg>',
+  Anillos:'<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="50" cy="62" r="24"/><path d="M40 36 L50 22 L60 36 L55 44 L45 44 Z"/></svg>',
+  Collares:'<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M28 30 Q50 64 72 30"/><circle cx="50" cy="66" r="9"/></svg>'
+};
+function money(n){return CFG.moneda+' '+Number(n).toFixed(2);}
+// merge product data with any edits saved from the admin panel
+function loadProducts(){
+  let base = (window.ORNATA_PRODUCTOS||[]).map(p=>({...p}));
+  try{
+    const ov = JSON.parse(localStorage.getItem('ornata_products')||'null');
+    if(Array.isArray(ov)&&ov.length) base = ov;
+    const imgs = JSON.parse(localStorage.getItem('ornata_images')||'{}');
+    base.forEach(p=>{ if(imgs[p.id]) p._dataimg = imgs[p.id]; });
+  }catch(e){}
+  return base;
+}
+let PRODUCTS = loadProducts();
+let activeCat = 'Todos';
+
+const grid=document.getElementById('prodGrid'),filters=document.getElementById('prodFilters'),emptyMsg=document.getElementById('prodEmpty');
+function imgSrc(p){ if(p._dataimg) return p._dataimg; if(!p.img) return ''; if(/^(https?:|data:)/.test(p.img)) return p.img; return 'assets/productos/'+p.img; }
+function fallback(p){ return '<div class="ph-fallback">'+(catIcon[p.categoria]||catIcon.Aretes)+'<small>Sube tu foto</small></div>'; }
+
+function renderFilters(){
+  const cats=['Todos',...Array.from(new Set(PRODUCTS.map(p=>p.categoria)))];
+  filters.innerHTML=cats.map(c=>`<button class="filter-chip${c===activeCat?' active':''}" data-cat="${c}">${c}</button>`).join('');
+  filters.querySelectorAll('.filter-chip').forEach(b=>b.addEventListener('click',()=>{activeCat=b.dataset.cat;renderFilters();renderGrid();}));
+}
+function renderGrid(){
+  const list=PRODUCTS.filter(p=>activeCat==='Todos'||p.categoria===activeCat);
+  emptyMsg.hidden=list.length>0;
+  grid.innerHTML=list.map((p,i)=>`
+    <div class="prod-card reveal ${'d'+((i%3)+1)} in">
+      <div class="prod-media">
+        ${p.tag?`<span class="tag">${p.tag}</span>`:''}
+        <img src="${imgSrc(p)}" alt="${p.nombre}" loading="lazy" onerror="this.style.display='none';this.insertAdjacentHTML('afterend', ORNATA_FB(this))" data-fb='${encodeURIComponent(fallback(p))}'>
+      </div>
+      <div class="prod-body">
+        <p class="cat">${p.categoria}</p>
+        <h3>${p.nombre}</h3>
+        <div class="prod-foot"><span class="price">${p.precio!=null?money(p.precio):'Consultar'}</span></div>
+        <button class="prod-add" data-id="${p.id}">Añadir al carrito</button>
+      </div>
+    </div>`).join('');
+  grid.querySelectorAll('.prod-add').forEach(b=>b.addEventListener('click',()=>{addToCart(b.dataset.id);b.classList.add('added');b.textContent='✓ Añadido';setTimeout(()=>{b.classList.remove('added');b.textContent='Añadir al carrito';},1200);}));
+}
+window.ORNATA_FB=function(imgEl){return decodeURIComponent(imgEl.getAttribute('data-fb'));};
+
+/* ---- carrito ---- */
+let cart={};
+try{cart=JSON.parse(localStorage.getItem('ornata_cart')||'{}');}catch(e){cart={};}
+function saveCart(){localStorage.setItem('ornata_cart',JSON.stringify(cart));}
+function cartCount(){return Object.values(cart).reduce((a,q)=>a+q,0);}
+function cartTotal(){return Object.entries(cart).reduce((t,[id,q])=>{const p=PRODUCTS.find(x=>x.id===id);return t+((p&&p.precio!=null)?p.precio*q:0);},0);}
+function addToCart(id){cart[id]=(cart[id]||0)+1;saveCart();updateCartUI();openCart();}
+function setQty(id,q){if(q<=0)delete cart[id];else cart[id]=q;saveCart();updateCartUI();}
+
+const cartBtn=document.getElementById('cartBtn'),cartCountEl=document.getElementById('cartCount'),
+      cartDrawer=document.getElementById('cartDrawer'),overlay=document.getElementById('overlay'),
+      cartItemsEl=document.getElementById('cartItems'),cartTotalEl=document.getElementById('cartTotal');
+function openCart(){cartDrawer.classList.add('open');overlay.classList.add('open');}
+function closeCart(){cartDrawer.classList.remove('open');overlay.classList.remove('open');}
+cartBtn.addEventListener('click',openCart);
+document.getElementById('cartClose').addEventListener('click',closeCart);
+overlay.addEventListener('click',()=>{closeCart();closeModal();});
+
+function updateCartUI(){
+  const c=cartCount();
+  cartCountEl.textContent=c;cartCountEl.classList.toggle('show',c>0);
+  cartTotalEl.textContent=money(cartTotal());
+  const ids=Object.keys(cart);
+  if(!ids.length){cartItemsEl.innerHTML='<p class="cart-empty">Tu carrito está vacío.<br>Añade tus joyas favoritas ✦</p>';return;}
+  cartItemsEl.innerHTML=ids.map(id=>{
+    const p=PRODUCTS.find(x=>x.id===id);if(!p)return'';const q=cart[id];
+    const media=p._dataimg||p.img?`<img src="${imgSrc(p)}" alt="${p.nombre}" onerror="this.replaceWith(document.createRange().createContextualFragment('${(catIcon[p.categoria]||catIcon.Aretes).replace(/'/g,"\\'")}'))">`:(catIcon[p.categoria]||catIcon.Aretes);
+    return `<div class="cart-item">
+      <div class="thumb">${media}</div>
+      <div class="ci-info">
+        <h4>${p.nombre}</h4>
+        <p class="ci-cat">${p.categoria}</p>
+        <p class="ci-price">${p.precio!=null?money(p.precio):'A consultar'}</p>
+        <div class="qty"><button data-m="-1" data-id="${id}">−</button><span>${q}</span><button data-m="1" data-id="${id}">+</button></div>
+      </div>
+      <button class="ci-remove" data-id="${id}">Quitar</button>
+    </div>`;
+  }).join('');
+  cartItemsEl.querySelectorAll('.qty button').forEach(b=>b.addEventListener('click',()=>setQty(b.dataset.id,(cart[b.dataset.id]||0)+(+b.dataset.m))));
+  cartItemsEl.querySelectorAll('.ci-remove').forEach(b=>b.addEventListener('click',()=>setQty(b.dataset.id,0)));
+}
+
+/* ---- checkout / pago ---- */
+const modal=document.getElementById('checkoutModal'),modalSummary=document.getElementById('modalSummary'),payDetail=document.getElementById('payDetail');
+let payMethod='yape';
+function openModal(){
+  if(!cartCount()){alert('Tu carrito está vacío.');return;}
+  buildSummary();buildPayDetail();modal.classList.add('open');overlay.classList.add('open');
+}
+function closeModal(){modal.classList.remove('open');}
+document.getElementById('checkoutBtn').addEventListener('click',()=>{closeCart();openModal();});
+document.getElementById('modalClose').addEventListener('click',closeModal);
+document.querySelectorAll('.pay-opt').forEach(o=>o.addEventListener('click',()=>{
+  document.querySelectorAll('.pay-opt').forEach(x=>x.classList.remove('active'));o.classList.add('active');payMethod=o.dataset.pay;buildPayDetail();
+}));
+function buildSummary(){
+  const rows=Object.entries(cart).map(([id,q])=>{const p=PRODUCTS.find(x=>x.id===id);if(!p)return'';
+    return `<div class="row"><span>${q} × ${p.nombre}</span><span>${p.precio!=null?money(p.precio*q):'A consultar'}</span></div>`;}).join('');
+  modalSummary.innerHTML=rows+`<div class="row tot"><span>Total</span><span>${money(cartTotal())}</span></div>`;
+}
+function buildPayDetail(){
+  if(payMethod==='yape'){
+    payDetail.innerHTML=`Paga con <b>Yape</b> o <b>Plin</b> al número:<br><span class="big">${CFG.yape}</span><br>Titular: <b>${CFG.titular}</b><br><small>Envía tu captura al confirmar el pedido.</small>`;
+  }else if(payMethod==='transfer'){
+    payDetail.innerHTML=`Transferencia bancaria a nombre de <b>${CFG.titular}</b>:<br>${CFG.banco?('Cuenta: <b>'+CFG.banco+'</b><br>'):'<small>◇ Añade tu cuenta bancaria en el Panel (admin.html)</small><br>'}${CFG.cci?('CCI: <b>'+CFG.cci+'</b>'):''}`;
+  }else{
+    payDetail.innerHTML=`<b>Pago con tarjeta.</b><br><small>Para cobrar con tarjeta necesitas conectar una pasarela (Culqi, Mercado Pago o Izipay). Mientras tanto, confirma el pedido y coordinamos el pago. Instrucciones en admin.html.</small>`;
+  }
+}
+document.getElementById('placeOrderBtn').addEventListener('click',()=>{
+  const name=document.getElementById('ckName').value.trim();
+  const phone=document.getElementById('ckPhone').value.trim();
+  const city=document.getElementById('ckCity').value.trim();
+  const addr=document.getElementById('ckAddr').value.trim();
+  if(!name||!phone){alert('Por favor completa al menos tu nombre y teléfono.');return;}
+  const lines=Object.entries(cart).map(([id,q])=>{const p=PRODUCTS.find(x=>x.id===id);return `• ${q} × ${p.nombre}${p.precio!=null?' ('+money(p.precio*q)+')':''}`;}).join('\n');
+  const payNames={yape:'Yape/Plin',transfer:'Transferencia',card:'Tarjeta'};
+  const msg=`✦ NUEVO PEDIDO — ORNATA JEWELRY ✦\n\n${lines}\n\nTotal: ${money(cartTotal())}\nPago: ${payNames[payMethod]}\n\nCliente: ${name}\nTel: ${phone}\nCiudad: ${city}\nDirección: ${addr}`;
+  window.open('https://wa.me/'+CFG.whatsapp+'?text='+encodeURIComponent(msg),'_blank');
+  cart={};saveCart();updateCartUI();closeModal();closeCart();
+  alert('¡Gracias por tu pedido! Se abrió WhatsApp para enviar tu comprobante y confirmar el envío.');
+});
+
+// init — carga de la nube (Firebase) si está configurada; si no, modo local
+async function initStore(){
+  if(window.OrnataDB && OrnataDB.enabled){
+    try{
+      const data=await OrnataDB.load();
+      if(data){
+        if(Array.isArray(data.productos)&&data.productos.length) PRODUCTS=data.productos;
+        if(data.config) Object.assign(CFG,data.config);
+      }
+    }catch(e){ console.warn('No se pudo cargar de la nube, usando datos locales:',e); }
+  }
+  renderFilters();renderGrid();updateCartUI();
+}
+initStore();
+// let collection cards filter the catalogue
+document.querySelectorAll('.coll-card').forEach(c=>{
+  const h=c.querySelector('h3'); if(!h)return;
+  c.style.cursor='pointer';
+  c.addEventListener('click',()=>{activeCat=h.textContent.trim();renderFilters();renderGrid();document.getElementById('destacados').scrollIntoView({behavior:'smooth'});});
+});
+</script>
+</body>
+</html>

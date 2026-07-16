@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Administración — ORNATA Jewelry</title>
+<link rel="icon" type="image/jpeg" href="assets/ornata-logo.jpeg">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--plum:#2e1f2e;--plum2:#3d2b3d;--lilac:#b79fc4;--lilac-s:#cbb8d6;--ivory:#f6f3f8;--gold:#c6a86b;--text:#2e1f2e;--soft:#6a5b68;--ease:cubic-bezier(.22,1,.36,1)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Jost',sans-serif;background:var(--ivory);color:var(--text);line-height:1.5}
+a{color:inherit}
+.serif{font-family:'Cormorant Garamond',serif}
+header{background:linear-gradient(120deg,#241621,#3d2b3d);color:#fff;padding:1.4rem 0}
+.wrap{width:min(1100px,94vw);margin-inline:auto}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.hd .brand{display:flex;align-items:center;gap:.9rem}
+.hd img{width:46px;height:46px;border-radius:50%}
+.hd h1{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600;letter-spacing:.08em}
+.hd h1 small{display:block;font-size:.55rem;letter-spacing:.4em;color:var(--gold);font-family:'Jost'}
+.hd a.view{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;border:1px solid rgba(255,255,255,.35);padding:.6em 1.3em;border-radius:100px;text-decoration:none;transition:.3s}
+.hd a.view:hover{background:#fff;color:var(--plum)}
+.bar{position:sticky;top:0;z-index:20;background:rgba(246,243,248,.9);backdrop-filter:blur(12px);border-bottom:1px solid rgba(183,159,196,.3);padding:.9rem 0}
+.bar .wrap{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap}
+.btn{font-family:'Jost';font-size:.76rem;letter-spacing:.1em;text-transform:uppercase;font-weight:500;padding:.75em 1.4em;border-radius:100px;border:none;cursor:pointer;transition:.35s var(--ease)}
+.btn-gold{background:linear-gradient(135deg,#d8c39a,#c6a86b);color:var(--plum)}
+.btn-gold:hover{transform:translateY(-2px);box-shadow:0 12px 26px -12px rgba(198,168,107,.8)}
+.btn-dark{background:var(--plum);color:#fff}.btn-dark:hover{background:var(--plum2)}
+.btn-ghost{background:transparent;border:1px solid var(--lilac);color:var(--plum)}
+.btn-ghost:hover{background:var(--plum);color:#fff}
+.hint{font-size:.8rem;color:var(--soft);margin-left:auto}
+.saved{color:#3f8a54;font-weight:500}
+main{padding:2rem 0 5rem}
+section.card{background:#fff;border-radius:12px;padding:1.6rem;margin-bottom:1.6rem;box-shadow:0 20px 50px -44px rgba(90,60,90,.5)}
+section.card h2{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--plum);margin-bottom:.3rem}
+section.card p.desc{color:var(--soft);font-size:.88rem;margin-bottom:1.2rem}
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.f label{display:block;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--plum2);margin-bottom:.35rem}
+.f input,.f textarea,.f select{width:100%;font-family:'Jost';font-size:.9rem;padding:.7em .9em;border:1px solid var(--lilac-s);border-radius:8px;background:#fff;color:var(--plum)}
+.f input:focus,.f textarea:focus,.f select:focus{outline:none;border-color:var(--gold)}
+.prod-row{display:grid;grid-template-columns:96px 1fr auto;gap:1rem;padding:1.1rem 0;border-bottom:1px solid rgba(183,159,196,.22);align-items:start}
+.thumb{width:96px;height:96px;border-radius:10px;overflow:hidden;background:linear-gradient(150deg,#efe6f3,#e4d6ec);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--plum2);background:rgba(255,255,255,.55);opacity:0;transition:.3s}
+.thumb:hover .lbl{opacity:1}
+.thumb .noimg{font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;color:var(--plum2);text-align:center;padding:.4rem}
+.pfields{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:.7rem}
+.pfields .full{grid-column:1/-1}
+.row-actions{display:flex;flex-direction:column;gap:.5rem}
+.mini{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;padding:.5em .9em;border-radius:100px;border:1px solid var(--lilac-s);background:#fff;cursor:pointer;color:var(--plum);transition:.3s;white-space:nowrap}
+.mini:hover{border-color:var(--gold)}
+.mini.del:hover{border-color:#c0392b;color:#c0392b}
+.count{font-size:.8rem;color:var(--soft)}
+.note{background:rgba(198,168,107,.12);border:1px dashed rgba(198,168,107,.5);border-radius:10px;padding:1rem 1.2rem;font-size:.85rem;color:var(--plum2);margin-bottom:1.4rem}
+.note b{color:var(--plum)}
+.steps{font-size:.85rem;color:var(--soft);line-height:1.9}
+.steps b{color:var(--plum)}
+@media(max-width:760px){.cfg-grid{grid-template-columns:1fr}.pfields{grid-template-columns:1fr 1fr}.prod-row{grid-template-columns:80px 1fr}.row-actions{flex-direction:row;grid-column:1/-1}.thumb{width:80px;height:80px}}
+</style>
+</head>
+<body>
+<!-- Pantalla de inicio de sesión (solo en modo Nube) -->
+<div id="loginGate" style="display:none;position:fixed;inset:0;z-index:100;background:linear-gradient(140deg,#241621,#3d2b3d);align-items:center;justify-content:center;padding:1.5rem">
+  <div style="background:#fff;border-radius:14px;padding:2.4rem;width:min(400px,94vw);box-shadow:0 40px 100px -30px rgba(0,0,0,.5);text-align:center">
+    <img src="assets/ornata-logo.jpeg" alt="ORNATA" style="width:72px;height:72px;border-radius:50%;margin:0 auto 1rem">
+    <h2 style="font-family:'Cormorant Garamond',serif;font-size:1.8rem;color:var(--plum);margin-bottom:.2rem">Panel ORNATA</h2>
+    <p style="color:var(--soft);font-size:.85rem;margin-bottom:1.5rem">Inicia sesión para administrar tu tienda</p>
+    <div class="f" style="text-align:left;margin-bottom:.9rem"><label>Correo</label><input id="loginEmail" type="email" placeholder="tucorreo@ejemplo.com"></div>
+    <div class="f" style="text-align:left;margin-bottom:1.2rem"><label>Contraseña</label><input id="loginPass" type="password" placeholder="••••••••"></div>
+    <button class="btn btn-gold" id="loginBtn" style="width:100%;justify-content:center">Entrar</button>
+    <p id="loginErr" style="color:#c0392b;font-size:.8rem;margin-top:.9rem;min-height:1rem"></p>
+  </div>
+</div>
+
+<header>
+  <div class="wrap hd">
+    <div class="brand">
+      <img src="assets/ornata-logo.jpeg" alt="ORNATA">
+      <h1>Panel ORNATA<small>ADMINISTRACIÓN</small></h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:.8rem">
+      <span id="modeBadge" style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;padding:.4em 1em;border-radius:100px;background:rgba(255,255,255,.14)"></span>
+      <button id="logoutBtn" class="view" style="display:none;cursor:pointer;background:none">Salir</button>
+      <a class="view" href="index.html" target="_blank">Ver la tienda ↗</a>
+    </div>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="wrap">
+    <button class="btn btn-gold" id="saveBtn">💾 Guardar cambios</button>
+    <button class="btn btn-dark" id="exportBtn">⬇ Exportar productos.js</button>
+    <button class="btn btn-ghost" id="addBtn">+ Añadir producto</button>
+    <button class="btn btn-ghost" id="resetBtn">↺ Restablecer</button>
+    <span class="hint" id="hint">Los cambios se ven al instante en la tienda de este navegador.</span>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="note">
+    <b>¿Cómo funciona?</b> Edita nombres, precios y categorías, y sube las fotos desde tu PC (clic en la imagen). Pulsa <b>Guardar cambios</b> y abre la tienda: se verá actualizada.
+    Para que los cambios sean <b>permanentes</b> (y funcionen al publicar la web), pulsa <b>Exportar productos.js</b> y reemplaza el archivo <b>data/productos.js</b> con el descargado.
+  </div>
+
+  <section class="card">
+    <h2>Datos del negocio y pagos</h2>
+    <p class="desc">Se usan en el catálogo, el carrito y la pasarela de pago.</p>
+    <div class="cfg-grid">
+      <div class="f"><label>WhatsApp (solo números, con código país)</label><input id="cfg_whatsapp" placeholder="51962735650"></div>
+      <div class="f"><label>Instagram (URL)</label><input id="cfg_instagram" placeholder="https://instagram.com/..."></div>
+      <div class="f"><label>Número Yape / Plin</label><input id="cfg_yape" placeholder="962 735 650"></div>
+      <div class="f"><label>Titular de la cuenta</label><input id="cfg_titular" placeholder="ORNATA Jewelry"></div>
+      <div class="f"><label>Cuenta bancaria (transferencia)</label><input id="cfg_banco" placeholder="BCP 191-XXXXXXXX-0-XX"></div>
+      <div class="f"><label>CCI (opcional)</label><input id="cfg_cci" placeholder="002-191-..."></div>
+      <div class="f"><label>Moneda</label><input id="cfg_moneda" placeholder="S/"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+      <div><h2>Productos</h2><p class="desc" style="margin:0">Clic en la foto para subir/cambiar la imagen.</p></div>
+      <span class="count" id="count"></span>
+    </div>
+    <div id="rows"></div>
+  </section>
+
+  <section class="card">
+    <h2>Conectar pago con tarjeta (opcional)</h2>
+    <p class="steps">
+      La tienda ya cobra por <b>Yape/Plin</b> y <b>transferencia</b> (el cliente envía su comprobante por WhatsApp al confirmar).<br>
+      Para aceptar <b>tarjetas de crédito/débito</b> en Perú necesitas una pasarela con cuenta de comercio:
+      <b>Culqi</b>, <b>Mercado Pago</b> o <b>Izipay</b>. Estas requieren registro y claves (API keys) y normalmente un pequeño servidor.
+      Cuando tengas la cuenta, dime cuál elegiste y la integro en el checkout. Mientras tanto, el pedido con tarjeta se coordina por WhatsApp.
+    </p>
+  </section>
+</main>
+
+<input type="file" id="fileInput" accept="image/*" style="display:none">
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="firebase-store.js"></script>
+<script src="data/productos.js"></script>
+<script>
+const DEFAULTS = JSON.parse(JSON.stringify(window.ORNATA_PRODUCTOS||[]));
+const DEFCFG = Object.assign({whatsapp:"51962735650",instagram:"",yape:"962 735 650",titular:"ORNATA Jewelry",banco:"",cci:"",moneda:"S/"}, window.ORNATA_CONFIG||{});
+let products=[], images={}, config={};
+const MODE = (window.OrnataDB && OrnataDB.enabled) ? 'firebase' : 'local';
+const badge=document.getElementById('modeBadge');
+badge.textContent = MODE==='firebase' ? '☁ Nube (Firebase)' : '● Local (este equipo)';
+
+function loadLocal(){
+  try{products=JSON.parse(localStorage.getItem('ornata_products'))||JSON.parse(JSON.stringify(DEFAULTS));}catch(e){products=JSON.parse(JSON.stringify(DEFAULTS));}
+  try{images=JSON.parse(localStorage.getItem('ornata_images')||'{}');}catch(e){images={};}
+  try{config=Object.assign({},DEFCFG,JSON.parse(localStorage.getItem('ornata_config')||'{}'));}catch(e){config=Object.assign({},DEFCFG);}
+}
+function resolveSrc(p){ if(images[p.id]) return images[p.id]; if(!p.img) return ''; if(/^(https?:|data:)/.test(p.img)) return p.img; return 'assets/productos/'+p.img; }
+function cleanP(p){ return {id:p.id,nombre:p.nombre,categoria:p.categoria,precio:p.precio,descripcion:p.descripcion,img:p.img||"",tag:p.tag||""}; }
+function fillConfig(){['whatsapp','instagram','yape','titular','banco','cci','moneda'].forEach(k=>{document.getElementById('cfg_'+k).value=config[k]||'';});}
+function boot(){ fillConfig(); render(); }
+
+const rows=document.getElementById('rows'),count=document.getElementById('count');
+function render(){
+  count.textContent=products.length+' productos';
+  rows.innerHTML=products.map((p,i)=>{
+    const src=resolveSrc(p);
+    const hasImg=images[p.id]||p.img;
+    return `<div class="prod-row" data-i="${i}">
+      <div class="thumb" data-img="${i}">
+        ${hasImg?`<img src="${src}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'noimg',textContent:'Sin foto'}))">`:'<div class="noimg">Subir foto</div>'}
+        <span class="lbl">Cambiar</span>
+      </div>
+      <div class="pfields">
+        <div class="f full"><label>Nombre</label><input value="${(p.nombre||'').replace(/"/g,'&quot;')}" data-k="nombre"></div>
+        <div class="f"><label>Categoría</label>
+          <select data-k="categoria">
+            ${['Aretes','Pulseras','Anillos','Collares'].map(c=>`<option ${p.categoria===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div class="f"><label>Precio (${config.moneda||'S/'})</label><input type="number" step="0.01" value="${p.precio!=null?p.precio:''}" placeholder="—" data-k="precio"></div>
+        <div class="f"><label>Etiqueta</label><input value="${(p.tag||'').replace(/"/g,'&quot;')}" placeholder="Nuevo…" data-k="tag"></div>
+        <div class="f full"><label>Descripción</label><input value="${(p.descripcion||'').replace(/"/g,'&quot;')}" data-k="descripcion"></div>
+        <div class="f"><label>Archivo (assets/productos/)</label><input value="${(p.img||'').replace(/"/g,'&quot;')}" placeholder="01.jpg" data-k="img"></div>
+      </div>
+      <div class="row-actions">
+        <button class="mini" data-up="${i}">↑</button>
+        <button class="mini" data-down="${i}">↓</button>
+        <button class="mini del" data-del="${i}">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+  // bind field edits
+  rows.querySelectorAll('.prod-row').forEach(row=>{
+    const i=+row.dataset.i;
+    row.querySelectorAll('[data-k]').forEach(inp=>inp.addEventListener('input',()=>{
+      let v=inp.value;const k=inp.dataset.k;
+      if(k==='precio')v=v===''?null:parseFloat(v);
+      products[i][k]=v;
+    }));
+    row.querySelector('.thumb').addEventListener('click',()=>pickImage(i));
+  });
+  rows.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{if(confirm('¿Eliminar este producto?')){const i=+b.dataset.del;const id=products[i].id;delete images[id];products.splice(i,1);render();}}));
+  rows.querySelectorAll('[data-up]').forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.up;if(i>0){[products[i-1],products[i]]=[products[i],products[i-1]];render();}}));
+  rows.querySelectorAll('[data-down]').forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.down;if(i<products.length-1){[products[i+1],products[i]]=[products[i],products[i+1]];render();}}));
+}
+
+// ---- arranque según modo ----
+if(MODE==='local'){
+  loadLocal(); boot();
+}else{
+  const gate=document.getElementById('loginGate'); gate.style.display='flex';
+  document.getElementById('loginBtn').addEventListener('click',doLogin);
+  document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  document.getElementById('logoutBtn').addEventListener('click',()=>OrnataDB.logout());
+  OrnataDB.onAuth(async (user)=>{
+    if(user){
+      gate.style.display='none';
+      document.getElementById('logoutBtn').style.display='inline-block';
+      await loadCloud(); boot();
+    }else{
+      document.getElementById('logoutBtn').style.display='none';
+      gate.style.display='flex';
+    }
+  });
+}
+function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  document.getElementById('loginErr').textContent='Entrando…';
+  OrnataDB.login(email,pass).then(()=>{document.getElementById('loginErr').textContent='';})
+    .catch(err=>{document.getElementById('loginErr').textContent='No se pudo entrar: '+(err.code||err.message);});
+}
+async function loadCloud(){
+  try{
+    const data=await OrnataDB.load();
+    products=(data&&Array.isArray(data.productos)&&data.productos.length)?data.productos:JSON.parse(JSON.stringify(DEFAULTS));
+    config=Object.assign({},DEFCFG,(data&&data.config)||{});
+    images={};
+  }catch(e){ alert('No se pudo cargar de la nube: '+e.message); products=JSON.parse(JSON.stringify(DEFAULTS)); config=Object.assign({},DEFCFG); }
+}
+
+// image upload
+const fileInput=document.getElementById('fileInput');let pickIndex=null;
+function pickImage(i){pickIndex=i;fileInput.value='';fileInput.click();}
+fileInput.addEventListener('change',()=>{
+  const file=fileInput.files[0];if(!file||pickIndex==null)return;
+  const i=pickIndex, id=products[i].id;
+  if(MODE==='firebase'){
+    flash('Subiendo imagen…');
+    OrnataDB.uploadImage(id,file).then(url=>{products[i].img=url;delete images[id];render();flash('Imagen subida a la nube ✓');})
+      .catch(err=>{alert('No se pudo subir la imagen: '+err.message);});
+  }else{
+    const reader=new FileReader();
+    reader.onload=()=>{images[id]=reader.result;render();flash('Imagen cargada — recuerda Guardar');};
+    reader.readAsDataURL(file);
+  }
+});
+
+// buttons
+function collectConfig(){['whatsapp','instagram','yape','titular','banco','cci','moneda'].forEach(k=>{config[k]=document.getElementById('cfg_'+k).value.trim();});}
+function flash(msg){const h=document.getElementById('hint');h.innerHTML='<span class="saved">✓ '+msg+'</span>';setTimeout(()=>h.textContent='Los cambios se ven al instante en la tienda de este navegador.',2600);}
+document.getElementById('saveBtn').addEventListener('click',()=>{
+  collectConfig();
+  if(MODE==='firebase'){
+    flash('Guardando en la nube…');
+    OrnataDB.save({productos:products.map(cleanP),config:config})
+      .then(()=>flash('Guardado en la nube ✓ La tienda ya está actualizada'))
+      .catch(err=>alert('No se pudo guardar en la nube: '+err.message));
+  }else{
+    localStorage.setItem('ornata_products',JSON.stringify(products));
+    localStorage.setItem('ornata_images',JSON.stringify(images));
+    localStorage.setItem('ornata_config',JSON.stringify(config));
+    flash('Cambios guardados (local)');
+  }
+});
+document.getElementById('addBtn').addEventListener('click',()=>{
+  const n=products.length+1;const id='p'+Date.now();
+  products.push({id,nombre:'Nuevo producto',categoria:'Aretes',precio:null,descripcion:'',img:'',tag:'Nuevo'});
+  render();window.scrollTo(0,document.body.scrollHeight);
+});
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  if(!confirm('Vuelve a los productos originales del archivo. En modo Nube no borra nada hasta que pulses Guardar. ¿Continuar?'))return;
+  if(MODE==='local'){localStorage.removeItem('ornata_products');localStorage.removeItem('ornata_images');localStorage.removeItem('ornata_config');loadLocal();}
+  else{products=JSON.parse(JSON.stringify(DEFAULTS));images={};config=Object.assign({},DEFCFG);}
+  boot();flash('Restablecido (recuerda Guardar)');
+});
+document.getElementById('exportBtn').addEventListener('click',()=>{
+  collectConfig();
+  const body='/* ORNATA JEWELRY — productos (exportado desde el Panel) */\n'+
+    'window.ORNATA_PRODUCTOS = '+JSON.stringify(products.map(p=>({id:p.id,nombre:p.nombre,categoria:p.categoria,precio:p.precio,descripcion:p.descripcion,img:p.img,tag:p.tag||""})),null,2)+';\n\n'+
+    'window.ORNATA_CONFIG = '+JSON.stringify(Object.assign({},config,{envio:"Envíos a todo el país"}),null,2)+';\n';
+  const blob=new Blob([body],{type:'text/javascript'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='productos.js';a.click();
+  flash('Descargado. Reemplaza data/productos.js con este archivo');
+});
+</script>
+</body>
+</html>

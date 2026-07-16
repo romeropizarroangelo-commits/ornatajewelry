@@ -1,0 +1,30 @@
+========================================================
+  PRODUCTOS DE ORNATA JEWELRY  —  plantilla para la web
+========================================================
+
+Rellena una línea por producto con este formato (separa con | ):
+
+nombre imagen | Nombre del producto | Categoría | Precio | Descripción corta
+
+Categorías válidas: Anillos, Collares, Aretes, Pulseras (o la que uses)
+
+--------------------------------------------------------
+EJEMPLO (bórralo y pon los tuyos):
+--------------------------------------------------------
+1.jpg | Anillo Solitario Aura | Anillos | S/ 89 | Plata 925 con circonia
+2.jpg | Collar Lumière        | Collares | S/ 120 | Baño de oro 18k
+3.jpg | Aretes Étoile         | Aretes   | S/ 65  | Acero quirúrgico dorado
+
+--------------------------------------------------------
+TUS PRODUCTOS (escribe aquí abajo):
+--------------------------------------------------------
+
+
+
+
+========================================================
+CÓMO PONER LAS FOTOS:
+1. Guarda cada foto del producto en ESTA carpeta (assets/productos)
+2. Nómbralas 1.jpg, 2.jpg, 3.jpg... (o el nombre que pongas arriba)
+3. Guarda este archivo y dime "listo" — yo genero la web con todo.
+========================================================

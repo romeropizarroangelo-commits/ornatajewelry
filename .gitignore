@@ -1,0 +1,12 @@
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Configuración de herramientas / proyectos anteriores
+.claude/
+.jlrepo/
+.jlrepo2/
+web-ruido-51.html
+
+# Node (por si acaso)
+node_modules/
