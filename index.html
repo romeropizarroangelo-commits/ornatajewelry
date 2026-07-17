@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ORNATA Jewelry — Joyas que cuentan tu historia</title>
-<meta name="description" content="ORNATA Jewelry — Joyería artesanal premium. Anillos, collares, aretes y pulseras diseñados para brillar contigo. Venta online con envíos a todo el país.">
+<meta name="description" content="ORNATA Jewelry — Joyería en acero inoxidable. Aretes y collares que no se oxidan ni se decoloran, diseñados para brillar contigo. Venta online con envíos a todo el país.">
 <link rel="icon" type="image/jpeg" href="assets/ornata-logo.jpeg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -194,6 +194,9 @@ h2.display{font-size:clamp(2.4rem,5.5vw,4.2rem);color:var(--plum-900);margin-bot
 .coll-icon{position:absolute;top:0;left:0;width:100%;height:60%;display:flex;align-items:center;justify-content:center;color:var(--lilac);opacity:.55;transition:.7s var(--ease)}
 .coll-card:hover .coll-icon{opacity:.9;transform:scale(1.08) translateY(-6px)}
 .coll-icon svg{width:44%}
+.coll-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .8s var(--ease)}
+.coll-card:hover .coll-img{transform:scale(1.07)}
+.coll-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(36,22,33,.92) 0%,rgba(36,22,33,.35) 50%,rgba(36,22,33,.12) 100%)}
 .coll-card h3{font-size:1.7rem;color:#fff;position:relative;z-index:2}
 .coll-card p{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-soft);position:relative;z-index:2;margin-top:.2rem}
 .coll-card .arrow{position:absolute;top:1.4rem;right:1.4rem;width:34px;height:34px;border-radius:50%;
@@ -307,7 +310,15 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
   transition:all .4s var(--ease);display:inline-flex;align-items:center;justify-content:center;gap:.5em}
 .prod-add:hover{background:linear-gradient(135deg,#d8c39a,#c6a86b);color:var(--plum-900)}
 .prod-add.added{background:#4f8a5b;color:#fff}
+.prod-add.out{background:#ddd5df;color:#8a7a88;cursor:not-allowed}
+.prod-add.out:hover{background:#ddd5df;color:#8a7a88}
 .prod-foot{align-items:baseline}
+/* etiquetas oferta / agotado y precios */
+.tag-sale{background:linear-gradient(135deg,#d8c39a,#c6a86b)!important;color:var(--plum-900)!important}
+.tag-out{background:#6a5b68!important;color:#fff!important}
+.price-old{color:var(--text-soft);text-decoration:line-through;font-size:.72em;margin-right:.2em;font-family:'Jost'}
+.prod-card.is-out .prod-media img{filter:grayscale(.45) opacity(.7)}
+.prod-card.is-out .prod-media .ph-fallback{filter:grayscale(.45) opacity(.85)}
 
 /* ---------- CART DRAWER ---------- */
 .overlay{position:fixed;inset:0;background:rgba(36,22,33,.55);backdrop-filter:blur(3px);opacity:0;visibility:hidden;
@@ -384,13 +395,37 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
 }
 @media(max-width:680px){
   .container{width:92vw}
-  .nav-links{position:fixed;top:0;right:-100%;height:100dvh;width:80%;max-width:340px;background:var(--ivory);
-    flex-direction:column;justify-content:center;gap:1.9rem;padding:3rem 2.4rem;transition:right .5s var(--ease);
-    box-shadow:-20px 0 60px -30px rgba(46,31,46,.5);z-index:99}
+  .nav-links{position:fixed;top:0;right:-102%;height:100dvh;width:84%;max-width:360px;
+    background:linear-gradient(165deg,#241621 0%,#3d2b3d 100%);
+    flex-direction:column;justify-content:center;align-items:stretch;gap:0;padding:5rem 2.4rem 2.6rem;
+    transition:right .55s var(--ease);box-shadow:-30px 0 80px -20px rgba(0,0,0,.55);z-index:99;overflow-y:auto}
+  .nav-links::before{content:"ORNATA";position:absolute;top:2rem;left:2.4rem;font-family:'Cormorant Garamond',serif;
+    font-size:1.2rem;letter-spacing:.34em;color:var(--gold-soft)}
   .nav-links.open{right:0}
-  .nav-links a{font-size:1rem}
-  .nav-links .nav-cta{margin-top:.6rem;font-size:.85rem}
-  .burger{display:flex;z-index:110}
+  .nav-links a{font-family:'Cormorant Garamond',serif;font-size:1.65rem;font-weight:500;color:#f1e9f4;
+    letter-spacing:.01em;text-transform:none;padding:1rem 0;width:100%;border-bottom:1px solid rgba(183,159,196,.15);
+    display:flex;align-items:center;justify-content:space-between;
+    opacity:0;transform:translateX(24px);transition:opacity .45s var(--ease),transform .45s var(--ease),color .3s,padding-left .3s}
+  .nav-links a::after{display:none}
+  .nav-links a::before{content:"→";color:var(--gold);font-size:.95rem;opacity:0;transition:.3s;order:2;font-family:'Jost'}
+  .nav-links a:active,.nav-links a:hover{color:#fff;padding-left:.5rem}
+  .nav-links a:hover::before{opacity:1}
+  .nav-links.open a{opacity:1;transform:none}
+  .nav-links.open a:nth-child(1){transition-delay:.1s}
+  .nav-links.open a:nth-child(2){transition-delay:.17s}
+  .nav-links.open a:nth-child(3){transition-delay:.24s}
+  .nav-links.open a:nth-child(4){transition-delay:.31s}
+  .nav-links.open a:nth-child(5){transition-delay:.38s}
+  .nav-links .nav-cta{margin-top:1.8rem;justify-content:center;border:none;border-radius:100px;
+    background:linear-gradient(135deg,#d8c39a,#c6a86b);color:var(--plum-900);
+    font-family:'Jost';font-size:.82rem;letter-spacing:.18em;text-transform:uppercase;padding:1.05em 1.5em}
+  .nav-links .nav-cta::before{display:none}
+  .burger{display:flex;z-index:110;position:relative}
+  .burger span{transition:transform .4s var(--ease),opacity .3s,background .3s}
+  .burger.open span{background:#f1e9f4}
+  .burger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+  .burger.open span:nth-child(2){opacity:0}
+  .burger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
   .nav-inner{gap:.4rem}
   .brand img{width:44px;height:44px}
   .brand-name{font-size:1.25rem}
@@ -493,7 +528,7 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
       <div class="ring-orbit two"><span class="dot"></span></div>
       <div class="logo"><img src="assets/ornata-logo.jpeg" alt="ORNATA Jewelry logo"></div>
     </div>
-    <div class="hero-eyebrow"><i></i><span id="heroEyebrow">Joyería artesanal · Piezas únicas</span><i></i></div>
+    <div class="hero-eyebrow"><i></i><span id="heroEyebrow">Acero inoxidable · Piezas únicas</span><i></i></div>
     <h1><span id="heroT1">Joyas que cuentan</span><br><span class="shine" id="heroT2">tu historia</span></h1>
     <p class="hero-sub" id="heroSub">Diseños atemporales creados para acompañarte en cada momento. Descubre la colección ORNATA y encuentra la pieza que brilla contigo.</p>
     <div class="hero-cta">
@@ -502,7 +537,7 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
     </div>
     <div class="hero-trust">
       <span>Envíos a todo el país</span>
-      <span>Hecho a mano</span>
+      <span>Acero inoxidable</span>
       <span>Atención por WhatsApp</span>
     </div>
   </div>
@@ -511,8 +546,8 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
 <!-- ===== MARQUEE ===== -->
 <div class="marquee">
   <div class="marquee-track">
-    <span>Envíos a todo el país</span><span>Joyería artesanal</span><span>Garantía de por vida</span><span>Packaging de regalo</span>
-    <span>Envíos a todo el país</span><span>Joyería artesanal</span><span>Garantía de por vida</span><span>Packaging de regalo</span>
+    <span>Envíos a todo el país</span><span>Acero inoxidable</span><span>No se oxida ni se decolora</span><span>Packaging de regalo</span>
+    <span>Envíos a todo el país</span><span>Acero inoxidable</span><span>No se oxida ni se decolora</span><span>Packaging de regalo</span>
   </div>
 </div>
 
@@ -531,12 +566,12 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
       <span class="eyebrow reveal">Nuestra esencia</span>
       <h2 class="display reveal d1" id="aboutTitle">Belleza que perdura</h2>
       <p class="reveal d2" id="aboutP1">En ORNATA creemos que una joya es mucho más que un accesorio: es un recuerdo, un símbolo, una forma de expresar quién eres. Por eso cada pieza está pensada al detalle, para acompañarte hoy y durante muchos años.</p>
-      <p class="reveal d3" id="aboutP2">Trabajamos con materiales seleccionados y acabados cuidados, combinando el diseño contemporáneo con la calidez de lo hecho a mano. Elegancia sencilla, para el día a día y para las ocasiones que importan.</p>
+      <p class="reveal d3" id="aboutP2">Todas nuestras piezas son de <strong>acero inoxidable</strong>: no se oxidan, no se ponen verdes ni se decoloran, y son hipoalergénicas. Conservan su brillo con el uso diario, para acompañarte en el día a día y en las ocasiones que importan.</p>
       <p class="about-sign reveal d4">— El equipo de ORNATA</p>
       <div class="stat-row reveal d5">
         <div class="stat"><b data-count="100">0</b><small>Diseños únicos</small></div>
         <div class="stat"><b data-count="24">0</b><small>Horas de envío*</small></div>
-        <div class="stat"><b data-count="100" data-suffix="%">0</b><small>Hecho con amor</small></div>
+        <div class="stat"><b data-count="100" data-suffix="%">0</b><small>Acero inoxidable</small></div>
       </div>
     </div>
   </div>
@@ -550,28 +585,7 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
       <h2 class="display reveal d1">Nuestras colecciones</h2>
       <p class="lead reveal d2">Cada colección tiene su propio carácter. Encuentra la que habla tu idioma.</p>
     </div>
-    <div class="coll-grid">
-      <div class="coll-card reveal d1">
-        <span class="arrow">→</span>
-        <div class="coll-icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="50" cy="62" r="26"/><path d="M38 34 L50 20 L62 34 L56 42 L44 42 Z"/><path d="M44 42 L50 34 L56 42"/></svg></div>
-        <h3>Anillos</h3><p>Compromiso &amp; diario</p>
-      </div>
-      <div class="coll-card reveal d2">
-        <span class="arrow">→</span>
-        <div class="coll-icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M28 28 Q50 62 72 28"/><circle cx="50" cy="66" r="9"/><path d="M50 57 L50 48"/></svg></div>
-        <h3>Collares</h3><p>Gargantillas &amp; dijes</p>
-      </div>
-      <div class="coll-card reveal d3">
-        <span class="arrow">→</span>
-        <div class="coll-icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="36" cy="40" r="5"/><path d="M36 45 L30 66 L42 66 Z"/><circle cx="64" cy="40" r="5"/><path d="M64 45 L58 66 L70 66 Z"/></svg></div>
-        <h3>Aretes</h3><p>Studs &amp; colgantes</p>
-      </div>
-      <div class="coll-card reveal d4">
-        <span class="arrow">→</span>
-        <div class="coll-icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="50" cy="50" rx="30" ry="22"/><ellipse cx="50" cy="50" rx="30" ry="22" stroke-dasharray="3 6"/><rect x="44" y="22" width="12" height="9" rx="2"/></svg></div>
-        <h3>Pulseras</h3><p>Charms &amp; minimal</p>
-      </div>
-    </div>
+    <div class="coll-grid" id="collGrid"></div>
   </div>
 </section>
 
@@ -599,7 +613,7 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
     <div class="feat-grid">
       <div class="feat reveal d1">
         <div class="feat-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 L15 9 L22 9.5 L16.5 14 L18.5 21 L12 17 L5.5 21 L7.5 14 L2 9.5 L9 9 Z"/></svg></div>
-        <h3>Calidad artesanal</h3><p>Piezas cuidadas al detalle, hechas para durar y acompañarte cada día.</p>
+        <h3>Acero inoxidable</h3><p>No se oxida ni se decolora. Resistente e hipoalergénico, para lucir cada día sin preocupaciones.</p>
       </div>
       <div class="feat reveal d2">
         <div class="feat-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="14" height="10" rx="1"/><path d="M16 10 H20 L22 13 V17 H16"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></div>
@@ -695,7 +709,7 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
     <div class="foot-grid">
       <div class="foot-brand">
         <img src="assets/ornata-logo.jpeg" alt="ORNATA Jewelry">
-        <p>Joyería artesanal premium. Diseños atemporales creados para acompañarte en cada historia.</p>
+        <p>Joyería en acero inoxidable. Diseños atemporales que no se oxidan ni se decoloran, para acompañarte en cada historia.</p>
       </div>
       <div class="foot-col">
         <h4>Tienda</h4>
@@ -722,8 +736,8 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
       </div>
     </div>
     <div class="foot-bottom">
-      <span>© 2026 ORNATA Jewelry. Todas las piezas, con amor.</span>
-      <span>Diseño premium con animaciones de scroll</span>
+      <span>© 2026 ORNATA Jewelry · Joyería en acero inoxidable</span>
+      <span>Envíos a todo el país 🇵🇪</span>
     </div>
   </div>
 </footer>
@@ -750,8 +764,8 @@ function onScroll(){
 window.addEventListener('scroll',onScroll,{passive:true});onScroll();
 
 const burger=document.getElementById('burger'),links=document.getElementById('navLinks');
-burger.addEventListener('click',()=>links.classList.toggle('open'));
-links.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>links.classList.remove('open')));
+burger.addEventListener('click',()=>{links.classList.toggle('open');burger.classList.toggle('open');});
+links.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{links.classList.remove('open');burger.classList.remove('open');}));
 
 const io=new IntersectionObserver((es)=>{
   es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}});
@@ -807,23 +821,58 @@ function renderFilters(){
   filters.innerHTML=cats.map(c=>`<button class="filter-chip${c===activeCat?' active':''}" data-cat="${c}">${c}</button>`).join('');
   filters.querySelectorAll('.filter-chip').forEach(b=>b.addEventListener('click',()=>{activeCat=b.dataset.cat;renderFilters();renderGrid();}));
 }
+function tieneOferta(p){ return p.oferta!=null && p.oferta!=='' && p.precio!=null && Number(p.oferta)<Number(p.precio); }
+function precioEfectivo(p){ return tieneOferta(p) ? Number(p.oferta) : p.precio; }
+function priceHtml(p){
+  if(p.precio==null && !tieneOferta(p)) return '<span class="price">Consultar</span>';
+  if(tieneOferta(p)) return '<span class="price"><span class="price-old">'+money(p.precio)+'</span> '+money(p.oferta)+'</span>';
+  return '<span class="price">'+money(p.precio)+'</span>';
+}
 function renderGrid(){
   const list=PRODUCTS.filter(p=>activeCat==='Todos'||p.categoria===activeCat);
   emptyMsg.hidden=list.length>0;
-  grid.innerHTML=list.map((p,i)=>`
-    <div class="prod-card reveal ${'d'+((i%3)+1)} in">
+  grid.innerHTML=list.map((p,i)=>{
+    const badge = p.agotado ? '<span class="tag tag-out">Agotado</span>'
+                : tieneOferta(p) ? '<span class="tag tag-sale">Oferta</span>'
+                : (p.tag?`<span class="tag">${p.tag}</span>`:'');
+    const addBtn = p.agotado
+      ? '<button class="prod-add out" disabled>Agotado</button>'
+      : `<button class="prod-add" data-id="${p.id}">Añadir al carrito</button>`;
+    return `
+    <div class="prod-card reveal ${'d'+((i%3)+1)} in${p.agotado?' is-out':''}">
       <div class="prod-media">
-        ${p.tag?`<span class="tag">${p.tag}</span>`:''}
+        ${badge}
         <img src="${imgSrc(p)}" alt="${p.nombre}" loading="lazy" onerror="this.style.display='none';this.insertAdjacentHTML('afterend', ORNATA_FB(this))" data-fb='${encodeURIComponent(fallback(p))}'>
       </div>
       <div class="prod-body">
         <p class="cat">${p.categoria}</p>
         <h3>${p.nombre}</h3>
-        <div class="prod-foot"><span class="price">${p.precio!=null?money(p.precio):'Consultar'}</span></div>
-        <button class="prod-add" data-id="${p.id}">Añadir al carrito</button>
+        <div class="prod-foot">${priceHtml(p)}</div>
+        ${addBtn}
       </div>
-    </div>`).join('');
-  grid.querySelectorAll('.prod-add').forEach(b=>b.addEventListener('click',()=>{addToCart(b.dataset.id);b.classList.add('added');b.textContent='✓ Añadido';setTimeout(()=>{b.classList.remove('added');b.textContent='Añadir al carrito';},1200);}));
+    </div>`;}).join('');
+  grid.querySelectorAll('.prod-add[data-id]').forEach(b=>b.addEventListener('click',()=>{addToCart(b.dataset.id);b.classList.add('added');b.textContent='✓ Añadido';setTimeout(()=>{b.classList.remove('added');b.textContent='Añadir al carrito';},1200);}));
+}
+/* ---- colecciones dinámicas con imágenes ---- */
+const CAT_META={
+  Aretes:{sub:'Studs, aros & colgantes',icon:catIcon.Aretes},
+  Collares:{sub:'Gargantillas & dijes',icon:catIcon.Collares},
+  Anillos:{sub:'Anillos & sellos',icon:catIcon.Anillos},
+  Pulseras:{sub:'Pulseras & charms',icon:catIcon.Pulseras}
+};
+function renderCollections(){
+  const g=document.getElementById('collGrid'); if(!g) return;
+  const cats=Array.from(new Set(PRODUCTS.map(p=>p.categoria)));
+  g.innerHTML=cats.map((c)=>{
+    const meta=CAT_META[c]||{sub:'',icon:catIcon.Aretes};
+    const rep=PRODUCTS.find(p=>p.categoria===c && (p._dataimg||(p.img&&p.img!=='')));
+    const media=rep?('<img class="coll-img" src="'+imgSrc(rep)+'" alt="'+c+'"><div class="coll-overlay"></div>')
+                   :('<div class="coll-icon">'+meta.icon+'</div>');
+    return '<div class="coll-card reveal in" data-cat="'+c+'" style="cursor:pointer"><span class="arrow">→</span>'+media+'<h3>'+c+'</h3><p>'+meta.sub+'</p></div>';
+  }).join('');
+  g.querySelectorAll('.coll-card').forEach(card=>card.addEventListener('click',()=>{
+    activeCat=card.dataset.cat;renderFilters();renderGrid();document.getElementById('destacados').scrollIntoView({behavior:'smooth'});
+  }));
 }
 window.ORNATA_FB=function(imgEl){return decodeURIComponent(imgEl.getAttribute('data-fb'));};
 
@@ -832,8 +881,8 @@ let cart={};
 try{cart=JSON.parse(localStorage.getItem('ornata_cart')||'{}');}catch(e){cart={};}
 function saveCart(){localStorage.setItem('ornata_cart',JSON.stringify(cart));}
 function cartCount(){return Object.values(cart).reduce((a,q)=>a+q,0);}
-function cartTotal(){return Object.entries(cart).reduce((t,[id,q])=>{const p=PRODUCTS.find(x=>x.id===id);return t+((p&&p.precio!=null)?p.precio*q:0);},0);}
-function addToCart(id){cart[id]=(cart[id]||0)+1;saveCart();updateCartUI();openCart();}
+function cartTotal(){return Object.entries(cart).reduce((t,[id,q])=>{const p=PRODUCTS.find(x=>x.id===id);const pr=p?precioEfectivo(p):null;return t+((pr!=null)?pr*q:0);},0);}
+function addToCart(id){const p=PRODUCTS.find(x=>x.id===id);if(p&&p.agotado){alert('Lo sentimos, este producto está agotado.');return;}cart[id]=(cart[id]||0)+1;saveCart();updateCartUI();openCart();}
 function setQty(id,q){if(q<=0)delete cart[id];else cart[id]=q;saveCart();updateCartUI();}
 
 const cartBtn=document.getElementById('cartBtn'),cartCountEl=document.getElementById('cartCount'),
@@ -859,7 +908,7 @@ function updateCartUI(){
       <div class="ci-info">
         <h4>${p.nombre}</h4>
         <p class="ci-cat">${p.categoria}</p>
-        <p class="ci-price">${p.precio!=null?money(p.precio):'A consultar'}</p>
+        <p class="ci-price">${tieneOferta(p)?('<span class="price-old">'+money(p.precio)+'</span> '+money(p.oferta)):(p.precio!=null?money(p.precio):'A consultar')}</p>
         <div class="qty"><button data-m="-1" data-id="${id}">−</button><span>${q}</span><button data-m="1" data-id="${id}">+</button></div>
       </div>
       <button class="ci-remove" data-id="${id}">Quitar</button>
@@ -883,8 +932,8 @@ document.querySelectorAll('.pay-opt').forEach(o=>o.addEventListener('click',()=>
   document.querySelectorAll('.pay-opt').forEach(x=>x.classList.remove('active'));o.classList.add('active');payMethod=o.dataset.pay;buildPayDetail();
 }));
 function buildSummary(){
-  const rows=Object.entries(cart).map(([id,q])=>{const p=PRODUCTS.find(x=>x.id===id);if(!p)return'';
-    return `<div class="row"><span>${q} × ${p.nombre}</span><span>${p.precio!=null?money(p.precio*q):'A consultar'}</span></div>`;}).join('');
+  const rows=Object.entries(cart).map(([id,q])=>{const p=PRODUCTS.find(x=>x.id===id);if(!p)return'';const pr=precioEfectivo(p);
+    return `<div class="row"><span>${q} × ${p.nombre}</span><span>${pr!=null?money(pr*q):'A consultar'}</span></div>`;}).join('');
   modalSummary.innerHTML=rows+`<div class="row tot"><span>Total</span><span>${money(cartTotal())}</span></div>`;
 }
 function buildPayDetail(){
@@ -902,7 +951,7 @@ document.getElementById('placeOrderBtn').addEventListener('click',()=>{
   const city=document.getElementById('ckCity').value.trim();
   const addr=document.getElementById('ckAddr').value.trim();
   if(!name||!phone){alert('Por favor completa al menos tu nombre y teléfono.');return;}
-  const lines=Object.entries(cart).map(([id,q])=>{const p=PRODUCTS.find(x=>x.id===id);return `• ${q} × ${p.nombre}${p.precio!=null?' ('+money(p.precio*q)+')':''}`;}).join('\n');
+  const lines=Object.entries(cart).map(([id,q])=>{const p=PRODUCTS.find(x=>x.id===id);const pr=precioEfectivo(p);return `• ${q} × ${p.nombre}${pr!=null?' ('+money(pr*q)+')':''}`;}).join('\n');
   const payNames={yape:'Yape/Plin',transfer:'Transferencia',card:'Tarjeta'};
   const msg=`✦ NUEVO PEDIDO — ORNATA JEWELRY ✦\n\n${lines}\n\nTotal: ${money(cartTotal())}\nPago: ${payNames[payMethod]}\n\nCliente: ${name}\nTel: ${phone}\nCiudad: ${city}\nDirección: ${addr}`;
   window.open('https://wa.me/'+CFG.whatsapp+'?text='+encodeURIComponent(msg),'_blank');
@@ -926,7 +975,7 @@ async function initStore(){
     }catch(e){ console.warn('No se pudo cargar de la nube, usando datos locales:',e); }
   }
   applyContent(aboutImg);
-  renderFilters();renderGrid();updateCartUI();
+  renderFilters();renderGrid();renderCollections();updateCartUI();
 }
 function applyContent(aboutImg){
   const setTxt=(id,v)=>{ if(v){ const el=document.getElementById(id); if(el) el.textContent=v; } };
@@ -943,12 +992,6 @@ function applyContent(aboutImg){
   if(CFG.ciudad){ const fc=document.getElementById('footCity'); if(fc){ fc.textContent=CFG.ciudad; fc.hidden=false; } }
 }
 initStore();
-// let collection cards filter the catalogue
-document.querySelectorAll('.coll-card').forEach(c=>{
-  const h=c.querySelector('h3'); if(!h)return;
-  c.style.cursor='pointer';
-  c.addEventListener('click',()=>{activeCat=h.textContent.trim();renderFilters();renderGrid();document.getElementById('destacados').scrollIntoView({behavior:'smooth'});});
-});
 </script>
 </body>
 </html>
