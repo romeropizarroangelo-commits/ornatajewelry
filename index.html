@@ -397,10 +397,13 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
   header.nav{padding:1rem 0}
   .pad{padding:3.6rem 0}
   /* Hero móvil más compacto y elegante */
-  .hero-content{padding:5.5rem 1rem 3rem}
+  .hero-content{padding:5.5rem 1rem 3rem;width:100%;max-width:100%}
+  .hero-sub{max-width:100%}
+  .hero-cta{max-width:100%}
   .medallion{width:clamp(150px,44vw,200px);margin-bottom:1.2rem}
-  .hero-eyebrow i{width:22px}
-  .hero-eyebrow span{font-size:.6rem;letter-spacing:.3em}
+  .hero h1{font-size:clamp(1.9rem,7.6vw,2.6rem);letter-spacing:-.02em}
+  .hero-eyebrow i{width:20px}
+  .hero-eyebrow span{font-size:.58rem;letter-spacing:.24em;white-space:normal;text-align:center}
   .hero-sub{margin:1rem auto 1.6rem}
   .hero-cta{flex-direction:column;align-items:center;gap:.7rem;width:100%}
   .hero-cta .btn{width:min(340px,88vw);justify-content:center}
@@ -919,7 +922,7 @@ async function initStore(){
       }
       const imgs=await OrnataDB.loadImages();
       PRODUCTS.forEach(p=>{ if(imgs[p.id]) p._dataimg=imgs[p.id]; });
-      if(imgs['__about__']) aboutImg=imgs['__about__'];
+      if(imgs['esencia']) aboutImg=imgs['esencia'];
     }catch(e){ console.warn('No se pudo cargar de la nube, usando datos locales:',e); }
   }
   applyContent(aboutImg);
