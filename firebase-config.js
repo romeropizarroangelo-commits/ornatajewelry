@@ -10,14 +10,14 @@
    internet y la tienda se actualiza para todos.
    ============================================================ */
 window.FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyBYMDi0ykd7-AcTXuDoIQiwb-aVX87S4G0",
+  authDomain: "ornata-jewelry.firebaseapp.com",
+  projectId: "ornata-jewelry",
+  storageBucket: "ornata-jewelry.firebasestorage.app",
+  messagingSenderId: "546150366175",
+  appId: "1:546150366175:web:03a9f50fd81dbb1b7f226a"
 };
 
 /* Correo del administrador (el que crearás en Firebase → Authentication).
    Solo este correo podrá entrar al panel a editar. */
-window.ORNATA_ADMIN_EMAIL = "";
+window.ORNATA_ADMIN_EMAIL = "romeropizarroangelo@gmail.com";
