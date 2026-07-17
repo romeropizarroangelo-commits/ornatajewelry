@@ -280,6 +280,24 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
 /* progress bar */
 .progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:200;background:linear-gradient(90deg,var(--lilac),var(--gold))}
 
+/* ---------- CUIDADOS ---------- */
+.care{background:linear-gradient(180deg,#faf8fb,#efe8f3)}
+.care-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem 1.8rem;margin-top:4rem}
+.care-card{position:relative;background:#fff;border-radius:16px;padding:2.6rem 1.8rem 1.9rem;
+  box-shadow:0 22px 55px -46px rgba(90,60,90,.55);transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
+.care-card:hover{transform:translateY(-8px);box-shadow:0 38px 66px -46px rgba(90,60,90,.55)}
+.care-num{position:absolute;top:-20px;left:1.9rem;width:46px;height:46px;border-radius:50%;
+  background:linear-gradient(140deg,#3d2b3d,#241621);color:var(--gold-soft);
+  display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;
+  box-shadow:0 12px 26px -10px rgba(46,31,46,.65)}
+.care-ic{width:54px;height:54px;margin:.7rem 0 1.1rem;border-radius:13px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#efe6f3,#e2d4ea);color:var(--plum-800)}
+.care-card h3{font-size:1.35rem;color:var(--plum-900);margin-bottom:.4rem}
+.care-card p{color:var(--text-soft);font-size:.94rem}
+.care-card strong{color:var(--plum-900);font-weight:600}
+.care-foot{text-align:center;margin-top:3rem;font-family:'Cormorant Garamond',serif;font-style:italic;
+  font-size:1.25rem;color:var(--plum-800)}
+
 /* ---------- CART BUTTON (nav) ---------- */
 .cart-btn{position:relative;background:none;border:none;cursor:pointer;color:var(--plum-900);
   display:inline-flex;align-items:center;justify-content:center;padding:.4rem;margin-left:.4rem;transition:transform .3s}
@@ -390,6 +408,7 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
   .coll-grid{grid-template-columns:repeat(2,1fr)}
   .prod-grid{grid-template-columns:repeat(2,1fr)}
   .feat-grid{grid-template-columns:repeat(2,1fr)}
+  .care-grid{grid-template-columns:repeat(2,1fr)}
   .steps{grid-template-columns:1fr;gap:1.6rem}
   .foot-grid{grid-template-columns:1fr 1fr;gap:2rem}
 }
@@ -416,6 +435,7 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
   .nav-links.open a:nth-child(3){transition-delay:.24s}
   .nav-links.open a:nth-child(4){transition-delay:.31s}
   .nav-links.open a:nth-child(5){transition-delay:.38s}
+  .nav-links.open a:nth-child(6){transition-delay:.45s}
   .nav-links .nav-cta{margin-top:1.8rem;justify-content:center;border:none;border-radius:100px;
     background:linear-gradient(135deg,#d8c39a,#c6a86b);color:var(--plum-900);
     font-family:'Jost';font-size:.82rem;letter-spacing:.18em;text-transform:uppercase;padding:1.05em 1.5em}
@@ -464,6 +484,13 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
   .feat h3{font-size:1.15rem}
   .feat p{font-size:.82rem}
   .feat-ic{width:48px;height:48px;margin-bottom:1rem}
+  .care-grid{grid-template-columns:1fr 1fr;gap:1.7rem 1rem;margin-top:3rem}
+  .care-card{padding:2.1rem 1.1rem 1.4rem}
+  .care-card h3{font-size:1.1rem}
+  .care-card p{font-size:.82rem}
+  .care-num{width:40px;height:40px;font-size:1.3rem;left:1.1rem;top:-18px}
+  .care-ic{width:46px;height:46px}
+  .care-foot{font-size:1.05rem}
   .foot-grid{grid-template-columns:1fr 1fr;gap:1.6rem 1.4rem}
   .foot-brand{grid-column:1/-1}
   .stat-row{gap:1.4rem}
@@ -483,6 +510,7 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
   .prod-grid{grid-template-columns:1fr}
   .coll-grid{grid-template-columns:1fr}
   .feat-grid{grid-template-columns:1fr}
+  .care-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -501,6 +529,7 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
       <a href="#colecciones">Colecciones</a>
       <a href="#destacados">Destacados</a>
       <a href="#nosotros">Nosotros</a>
+      <a href="#cuidados">Cuidados</a>
       <a href="#proceso">Cómo comprar</a>
       <a href="#contacto" class="nav-cta">Contáctanos</a>
     </nav>
@@ -643,6 +672,56 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
       <div class="step reveal d2"><div class="step-num">02</div><h3>Escríbenos</h3><p>Confirma tu pedido por WhatsApp o Instagram. Te asesoramos con talla y detalles.</p></div>
       <div class="step reveal d3"><div class="step-num">03</div><h3>Recíbela en casa</h3><p>Preparamos tu pedido con cariño y lo enviamos a tu puerta, listo para lucir.</p></div>
     </div>
+  </div>
+</section>
+
+<!-- ===== CUIDADOS ===== -->
+<section class="care pad" id="cuidados">
+  <div class="container">
+    <div class="section-head center">
+      <span class="eyebrow reveal">Cuidado &amp; consejos</span>
+      <h2 class="display reveal d1">¿Cómo cuidar tu joyería?</h2>
+      <p class="lead reveal d2">Nuestras piezas son de acero inoxidable y muy resistentes. Con estos 6 cuidados lucirán impecables por mucho más tiempo.</p>
+    </div>
+    <div class="care-grid">
+      <div class="care-card reveal d1">
+        <span class="care-num">1</span>
+        <div class="care-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4.5" width="8" height="8" rx="1.5"/><rect x="13" y="11.5" width="8" height="8" rx="1.5"/></svg></div>
+        <h3>Guárdalas por separado</h3>
+        <p>Guarda cada pieza aparte para que <strong>no se rayen</strong> entre sí.</p>
+      </div>
+      <div class="care-card reveal d2">
+        <span class="care-num">2</span>
+        <div class="care-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="8" y="9" width="8" height="11" rx="2"/><path d="M10 9V6h4v3M11 4h2"/><line x1="4" y1="3.5" x2="20" y2="20.5"/></svg></div>
+        <h3>Lejos de perfumes</h3>
+        <p>Evita el contacto directo con <strong>lociones y perfumes</strong>.</p>
+      </div>
+      <div class="care-card reveal d3">
+        <span class="care-num">3</span>
+        <div class="care-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9c2 0 2 1.4 4 1.4S9 9 11 9s2 1.4 4 1.4S17 9 19 9"/><path d="M3 14c2 0 2 1.4 4 1.4S9 14 11 14s2 1.4 4 1.4S17 14 19 14"/><line x1="4" y1="3.5" x2="20" y2="20.5"/></svg></div>
+        <h3>Nada de playa ni piscina</h3>
+        <p>No las uses en la <strong>playa ni la piscina</strong>: el cloro y la sal las dañan.</p>
+      </div>
+      <div class="care-card reveal d1">
+        <span class="care-num">4</span>
+        <div class="care-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 9v6M18 9v6M4 10.5v3M20 10.5v3M6 12h12"/><line x1="4" y1="3.5" x2="20" y2="20.5"/></svg></div>
+        <h3>No en el ejercicio</h3>
+        <p>Evita usarlas durante <strong>actividades físicas</strong> o deporte.</p>
+      </div>
+      <div class="care-card reveal d2">
+        <span class="care-num">5</span>
+        <div class="care-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 4c3 4 5 6.5 5 9a5 5 0 0 1-10 0c0-2.5 2-5 5-9z"/><line x1="4" y1="3.5" x2="20" y2="20.5"/></svg></div>
+        <h3>Lugar fresco y seco</h3>
+        <p>Consérvalas en un <strong>lugar fresco y sin humedad</strong>.</p>
+      </div>
+      <div class="care-card reveal d3">
+        <span class="care-num">6</span>
+        <div class="care-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 3l1.7 3.9L16.5 8.5l-3.8 1.6L11 14l-1.7-3.9L5.5 8.5l3.8-1.6z"/><circle cx="17.5" cy="16.5" r="2.2"/></svg></div>
+        <h3>Límpialas con un paño</h3>
+        <p>Después de cada uso, <strong>límpialas con un paño</strong> suave de pulido.</p>
+      </div>
+    </div>
+    <p class="care-foot reveal">✦ Con estos cuidados, tu joyería ORNATA conservará su brillo por mucho tiempo.</p>
   </div>
 </section>
 
