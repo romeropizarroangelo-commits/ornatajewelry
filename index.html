@@ -395,13 +395,13 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
 }
 @media(max-width:680px){
   .container{width:92vw}
-  .nav-links{position:fixed;top:0;right:-102%;height:100dvh;width:84%;max-width:360px;
+  .nav-links{position:fixed;top:0;right:0;height:100dvh;width:84%;max-width:360px;
     background:linear-gradient(165deg,#241621 0%,#3d2b3d 100%);
     flex-direction:column;justify-content:center;align-items:stretch;gap:0;padding:5rem 2.4rem 2.6rem;
-    transition:right .55s var(--ease);box-shadow:-30px 0 80px -20px rgba(0,0,0,.55);z-index:99;overflow-y:auto}
+    transform:translateX(105%);transition:transform .55s var(--ease);box-shadow:-30px 0 80px -20px rgba(0,0,0,.55);z-index:99;overflow-y:auto}
   .nav-links::before{content:"ORNATA";position:absolute;top:2rem;left:2.4rem;font-family:'Cormorant Garamond',serif;
     font-size:1.2rem;letter-spacing:.34em;color:var(--gold-soft)}
-  .nav-links.open{right:0}
+  .nav-links.open{transform:translateX(0)}
   .nav-links a{font-family:'Cormorant Garamond',serif;font-size:1.65rem;font-weight:500;color:#f1e9f4;
     letter-spacing:.01em;text-transform:none;padding:1rem 0;width:100%;border-bottom:1px solid rgba(183,159,196,.15);
     display:flex;align-items:center;justify-content:space-between;
