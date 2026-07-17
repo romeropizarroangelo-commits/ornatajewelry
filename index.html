@@ -869,6 +869,8 @@ async function initStore(){
         if(Array.isArray(data.productos)&&data.productos.length) PRODUCTS=data.productos;
         if(data.config) Object.assign(CFG,data.config);
       }
+      const imgs=await OrnataDB.loadImages();
+      PRODUCTS.forEach(p=>{ if(imgs[p.id]) p._dataimg=imgs[p.id]; });
     }catch(e){ console.warn('No se pudo cargar de la nube, usando datos locales:',e); }
   }
   renderFilters();renderGrid();updateCartUI();

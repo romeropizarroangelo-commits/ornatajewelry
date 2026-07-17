@@ -1,25 +1,29 @@
 /* ============================================================
    ORNATA — Capa de datos (Firebase o Local)
    ------------------------------------------------------------
-   Expone window.OrnataDB con una API común:
-     OrnataDB.enabled            -> true si Firebase está configurado
-     OrnataDB.load()             -> {productos, config} | null
-     OrnataDB.save({productos,config})
-     OrnataDB.uploadImage(id, file) -> URL de descarga
-     OrnataDB.login(email, pass) / logout() / onAuth(cb) / user()
-   Si Firebase NO está configurado, enabled=false y la web usa el
-   modo local (productos.js + localStorage), sin romperse.
+   Guarda productos y configuración en Firestore (doc ornata/data)
+   y las FOTOS como base64 en la colección "imagenes" (1 doc por
+   producto). Así NO se necesita Storage (ni tarjeta): todo gratis
+   en el plan Spark.
+
+   API (window.OrnataDB):
+     enabled                 -> true si Firebase está configurado
+     load()                  -> {productos, config} | null
+     save({productos,config})
+     loadImages()            -> { idProducto: dataURLbase64 }
+     saveImage(id, dataURL)
+     deleteImage(id)
+     login/logout/onAuth/user
    ============================================================ */
 window.OrnataDB = (function () {
   var cfg = window.FIREBASE_CONFIG || {};
   var enabled = !!(cfg.apiKey && cfg.projectId && window.firebase);
-  var db, storage, auth;
+  var db, auth;
 
   if (enabled) {
     try {
       firebase.initializeApp(cfg);
       db = firebase.firestore();
-      storage = firebase.storage();
       auth = firebase.auth();
     } catch (e) {
       console.error("Firebase no pudo iniciar:", e);
@@ -48,11 +52,23 @@ window.OrnataDB = (function () {
       });
     },
 
-    uploadImage: function (id, file) {
+    loadImages: function () {
+      if (!enabled) return Promise.resolve({});
+      return db.collection("imagenes").get().then(function (snap) {
+        var out = {};
+        snap.forEach(function (d) { out[d.id] = (d.data() || {}).data || ""; });
+        return out;
+      });
+    },
+
+    saveImage: function (id, dataUrl) {
       if (!enabled) return Promise.reject(new Error("Firebase no configurado"));
-      var safe = String(id).replace(/[^a-z0-9_-]/gi, "");
-      var ref = storage.ref("productos/" + safe + "_" + Date.now() + "_" + (file.name || "img"));
-      return ref.put(file).then(function () { return ref.getDownloadURL(); });
+      return db.collection("imagenes").doc(id).set({ data: dataUrl });
+    },
+
+    deleteImage: function (id) {
+      if (!enabled) return Promise.resolve();
+      return db.collection("imagenes").doc(id).delete().catch(function () {});
     },
 
     login: function (email, pass) { return auth.signInWithEmailAndPassword(email, pass); },
