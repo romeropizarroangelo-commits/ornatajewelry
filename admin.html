@@ -109,11 +109,38 @@ section.card p.desc{color:var(--soft);font-size:.88rem;margin-bottom:1.2rem}
     <div class="cfg-grid">
       <div class="f"><label>WhatsApp (solo números, con código país)</label><input id="cfg_whatsapp" placeholder="51962735650"></div>
       <div class="f"><label>Instagram (URL)</label><input id="cfg_instagram" placeholder="https://instagram.com/..."></div>
+      <div class="f"><label>Ciudad / país (opcional)</label><input id="cfg_ciudad" placeholder="Lima, Perú"></div>
       <div class="f"><label>Número Yape / Plin</label><input id="cfg_yape" placeholder="962 735 650"></div>
       <div class="f"><label>Titular de la cuenta</label><input id="cfg_titular" placeholder="ORNATA Jewelry"></div>
       <div class="f"><label>Cuenta bancaria (transferencia)</label><input id="cfg_banco" placeholder="BCP 191-XXXXXXXX-0-XX"></div>
       <div class="f"><label>CCI (opcional)</label><input id="cfg_cci" placeholder="002-191-..."></div>
       <div class="f"><label>Moneda</label><input id="cfg_moneda" placeholder="S/"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Textos e imagen de la página</h2>
+    <p class="desc">Personaliza los textos del inicio y la sección “Nuestra esencia”. Deja un campo vacío para usar el texto por defecto.</p>
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:1.4rem;align-items:start">
+      <div>
+        <label style="display:block;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--plum2);margin-bottom:.35rem">Foto “Nuestra esencia”</label>
+        <div class="thumb" id="aboutThumb" style="width:100%;height:180px;border-radius:12px">
+          <div class="noimg">Subir foto</div>
+          <span class="lbl">Cambiar</span>
+        </div>
+        <p class="desc" style="margin:.5rem 0 0;font-size:.72rem">Se muestra en la sección “Nuestra esencia”.</p>
+      </div>
+      <div>
+        <div class="cfg-grid">
+          <div class="f"><label>Inicio — línea pequeña</label><input id="cfg_heroEyebrow" placeholder="Joyería artesanal · Piezas únicas"></div>
+          <div class="f"><label>Inicio — título (línea 1)</label><input id="cfg_heroT1" placeholder="Joyas que cuentan"></div>
+          <div class="f"><label>Inicio — palabra destacada (línea 2)</label><input id="cfg_heroT2" placeholder="tu historia"></div>
+          <div class="f"><label>Inicio — subtítulo</label><input id="cfg_heroSub" placeholder="Diseños atemporales..."></div>
+        </div>
+        <div class="f" style="margin-top:1rem"><label>“Nuestra esencia” — título</label><input id="cfg_aboutTitle" placeholder="Belleza que perdura"></div>
+        <div class="f" style="margin-top:1rem"><label>“Nuestra esencia” — párrafo 1</label><textarea id="cfg_aboutP1" rows="3" placeholder="En ORNATA creemos que..."></textarea></div>
+        <div class="f" style="margin-top:1rem"><label>“Nuestra esencia” — párrafo 2</label><textarea id="cfg_aboutP2" rows="3" placeholder="Trabajamos con materiales..."></textarea></div>
+      </div>
     </div>
   </section>
 
@@ -137,6 +164,7 @@ section.card p.desc{color:var(--soft);font-size:.88rem;margin-bottom:1.2rem}
 </main>
 
 <input type="file" id="fileInput" accept="image/*" style="display:none">
+<input type="file" id="aboutFileInput" accept="image/*" style="display:none">
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -160,8 +188,13 @@ function loadLocal(){
 }
 function resolveSrc(p){ if(images[p.id]) return images[p.id]; if(!p.img) return ''; if(/^(https?:|data:)/.test(p.img)) return p.img; return 'assets/productos/'+p.img; }
 function cleanP(p){ return {id:p.id,nombre:p.nombre,categoria:p.categoria,precio:p.precio,descripcion:p.descripcion,img:p.img||"",tag:p.tag||""}; }
-function fillConfig(){['whatsapp','instagram','yape','titular','banco','cci','moneda'].forEach(k=>{document.getElementById('cfg_'+k).value=config[k]||'';});}
-function boot(){ fillConfig(); render(); }
+function fillConfig(){['whatsapp','instagram','ciudad','yape','titular','banco','cci','moneda','heroEyebrow','heroT1','heroT2','heroSub','aboutTitle','aboutP1','aboutP2'].forEach(k=>{document.getElementById('cfg_'+k).value=config[k]||'';});}
+function boot(){ fillConfig(); render(); renderAboutThumb(); }
+function renderAboutThumb(){
+  var t=document.getElementById('aboutThumb'); if(!t) return;
+  var src=images['__about__'];
+  t.innerHTML = (src ? '<img src="'+src+'">' : '<div class="noimg">Subir foto</div>') + '<span class="lbl">Cambiar</span>';
+}
 
 const rows=document.getElementById('rows'),count=document.getElementById('count');
 function render(){
@@ -262,6 +295,20 @@ function compressImage(file, maxDim, quality){
   });
 }
 
+// imagen de "Nuestra esencia"
+const aboutFileInput=document.getElementById('aboutFileInput');
+document.getElementById('aboutThumb').addEventListener('click',function(){
+  if(MODE!=='firebase'){ alert('La foto de "Nuestra esencia" se guarda en la nube. Entra en modo Nube (Firebase) para subirla.'); return; }
+  aboutFileInput.value=''; aboutFileInput.click();
+});
+aboutFileInput.addEventListener('change',function(){
+  var file=aboutFileInput.files[0]; if(!file) return;
+  flash('Procesando y guardando la foto…');
+  compressImage(file,1200,0.85).then(function(dataUrl){
+    return OrnataDB.saveImage('__about__',dataUrl).then(function(){ images['__about__']=dataUrl; renderAboutThumb(); flash('Foto de "Nuestra esencia" guardada ✓'); });
+  }).catch(function(err){ alert('No se pudo guardar la foto: '+err.message); });
+});
+
 // image upload
 const fileInput=document.getElementById('fileInput');let pickIndex=null;
 function pickImage(i){pickIndex=i;fileInput.value='';fileInput.click();}
@@ -281,7 +328,7 @@ fileInput.addEventListener('change',()=>{
 });
 
 // buttons
-function collectConfig(){['whatsapp','instagram','yape','titular','banco','cci','moneda'].forEach(k=>{config[k]=document.getElementById('cfg_'+k).value.trim();});}
+function collectConfig(){['whatsapp','instagram','ciudad','yape','titular','banco','cci','moneda','heroEyebrow','heroT1','heroT2','heroSub','aboutTitle','aboutP1','aboutP2'].forEach(k=>{config[k]=document.getElementById('cfg_'+k).value.trim();});}
 function flash(msg){const h=document.getElementById('hint');h.innerHTML='<span class="saved">✓ '+msg+'</span>';setTimeout(()=>h.textContent='Los cambios se ven al instante en la tienda de este navegador.',2600);}
 document.getElementById('saveBtn').addEventListener('click',()=>{
   collectConfig();

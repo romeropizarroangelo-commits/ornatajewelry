@@ -374,7 +374,8 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
 
 /* ---------- RESPONSIVE ---------- */
 @media(max-width:960px){
-  .about-grid{grid-template-columns:1fr;gap:3rem}
+  .about-grid{grid-template-columns:1fr;gap:2.4rem}
+  .about-visual{max-width:420px;margin-inline:auto;width:100%}
   .coll-grid{grid-template-columns:repeat(2,1fr)}
   .prod-grid{grid-template-columns:repeat(2,1fr)}
   .feat-grid{grid-template-columns:repeat(2,1fr)}
@@ -382,19 +383,68 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
   .foot-grid{grid-template-columns:1fr 1fr;gap:2rem}
 }
 @media(max-width:680px){
-  .nav-links{position:fixed;top:0;right:-100%;height:100vh;width:74%;background:var(--ivory);
-    flex-direction:column;justify-content:center;gap:2rem;padding:3rem;transition:right .5s var(--ease);
+  .container{width:92vw}
+  .nav-links{position:fixed;top:0;right:-100%;height:100dvh;width:80%;max-width:340px;background:var(--ivory);
+    flex-direction:column;justify-content:center;gap:1.9rem;padding:3rem 2.4rem;transition:right .5s var(--ease);
     box-shadow:-20px 0 60px -30px rgba(46,31,46,.5);z-index:99}
   .nav-links.open{right:0}
-  .nav-links .nav-cta{margin-top:1rem}
-  .burger{display:flex;z-index:100}
+  .nav-links a{font-size:1rem}
+  .nav-links .nav-cta{margin-top:.6rem;font-size:.85rem}
+  .burger{display:flex;z-index:110}
+  .nav-inner{gap:.4rem}
+  .brand img{width:44px;height:44px}
+  .brand-name{font-size:1.25rem}
+  header.nav{padding:1rem 0}
+  .pad{padding:3.6rem 0}
+  /* Hero móvil más compacto y elegante */
+  .hero-content{padding:5.5rem 1rem 3rem}
+  .medallion{width:clamp(150px,44vw,200px);margin-bottom:1.2rem}
+  .hero-eyebrow i{width:22px}
+  .hero-eyebrow span{font-size:.6rem;letter-spacing:.3em}
+  .hero-sub{margin:1rem auto 1.6rem}
+  .hero-cta{flex-direction:column;align-items:center;gap:.7rem;width:100%}
+  .hero-cta .btn{width:min(340px,88vw);justify-content:center}
+  .hero-trust{gap:.5rem 1.2rem;margin-top:1.6rem}
+  .hero-trust span{font-size:.62rem;letter-spacing:.08em}
+  /* Catálogo: 2 columnas tipo tienda */
+  .prod-grid{grid-template-columns:repeat(2,1fr);gap:.9rem;margin-top:2.4rem}
+  .prod-body{padding:.9rem .9rem 1.1rem}
+  .prod-body h3{font-size:1.12rem;line-height:1.15}
+  .prod-body .cat{font-size:.56rem;letter-spacing:.16em}
+  .prod-foot{margin-top:.5rem}
+  .price{font-size:1.05rem}
+  .prod-add{margin-top:.7rem;padding:.85em .6em;font-size:.62rem;letter-spacing:.1em}
+  .prod-media .tag{font-size:.52rem;padding:.35em .7em;top:8px;left:8px}
+  .prod-filters{gap:.45rem;margin:1.8rem 0 2rem}
+  .filter-chip{font-size:.66rem;padding:.62em 1.1em}
+  .coll-grid{grid-template-columns:1fr 1fr;gap:.8rem;margin-top:2.2rem}
+  .coll-card{padding:1.2rem;aspect-ratio:4/5}
+  .coll-card h3{font-size:1.3rem}
+  .coll-card p{font-size:.62rem}
+  .feat-grid{grid-template-columns:1fr 1fr;gap:.9rem;margin-top:2.2rem}
+  .feat{padding:1.6rem 1rem}
+  .feat h3{font-size:1.15rem}
+  .feat p{font-size:.82rem}
+  .feat-ic{width:48px;height:48px;margin-bottom:1rem}
+  .foot-grid{grid-template-columns:1fr 1fr;gap:1.6rem 1.4rem}
+  .foot-brand{grid-column:1/-1}
+  .stat-row{gap:1.4rem}
+  .stat b{font-size:2.2rem}
+  h2.display{font-size:clamp(2rem,8vw,2.8rem)}
+  .marquee span{font-size:1.1rem;gap:2.4rem}
+  .marquee-track{gap:2.4rem}
+  /* Carrito y checkout a pantalla completa cómoda */
+  .cart-drawer{width:100%;max-width:none}
+  .field-row{grid-template-columns:1fr}
+  .modal-card{padding:1.5rem 1.2rem;border-radius:16px 16px 0 0;max-height:94vh}
+  .modal{align-items:flex-end;padding:0}
+  .pay-opt{padding:.7rem .4rem}
+  .pay-opt .pi{font-size:.95rem}
+}
+@media(max-width:400px){
   .prod-grid{grid-template-columns:1fr}
-  .coll-grid{grid-template-columns:1fr 1fr;gap:1rem}
+  .coll-grid{grid-template-columns:1fr}
   .feat-grid{grid-template-columns:1fr}
-  .foot-grid{grid-template-columns:1fr}
-  .stat-row{gap:1.8rem}
-  .hero-cta{flex-direction:column;align-items:center}
-  .hero-cta .btn{width:min(320px,80vw);justify-content:center}
 }
 </style>
 </head>
@@ -440,9 +490,9 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
       <div class="ring-orbit two"><span class="dot"></span></div>
       <div class="logo"><img src="assets/ornata-logo.jpeg" alt="ORNATA Jewelry logo"></div>
     </div>
-    <div class="hero-eyebrow"><i></i><span>Joyería artesanal · Piezas únicas</span><i></i></div>
-    <h1>Joyas que cuentan<br><span class="shine">tu historia</span></h1>
-    <p class="hero-sub">Diseños atemporales creados para acompañarte en cada momento. Descubre la colección ORNATA y encuentra la pieza que brilla contigo.</p>
+    <div class="hero-eyebrow"><i></i><span id="heroEyebrow">Joyería artesanal · Piezas únicas</span><i></i></div>
+    <h1><span id="heroT1">Joyas que cuentan</span><br><span class="shine" id="heroT2">tu historia</span></h1>
+    <p class="hero-sub" id="heroSub">Diseños atemporales creados para acompañarte en cada momento. Descubre la colección ORNATA y encuentra la pieza que brilla contigo.</p>
     <div class="hero-cta">
       <a href="#destacados" class="btn btn-gold">Ver catálogo ✦</a>
       <a href="#nosotros" class="btn btn-outline">Nuestra historia</a>
@@ -466,20 +516,19 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
 <!-- ===== NOSOTROS ===== -->
 <section class="about pad" id="nosotros">
   <div class="container about-grid">
-    <div class="about-visual reveal">
+    <div class="about-visual reveal" id="aboutVisual">
       <svg class="ring-illu" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="1.4">
         <circle cx="100" cy="120" r="52"/>
         <circle cx="100" cy="120" r="42" stroke-dasharray="2 5"/>
         <path d="M78 70 L100 42 L122 70 L112 82 L88 82 Z"/>
         <path d="M88 82 L100 70 L112 82 M100 42 L100 70"/>
       </svg>
-      <span class="ph-note">◇ Reemplaza con foto de tu taller / producto</span>
     </div>
     <div class="about-text">
       <span class="eyebrow reveal">Nuestra esencia</span>
-      <h2 class="display reveal d1">Belleza que perdura</h2>
-      <p class="reveal d2">En ORNATA creemos que una joya es mucho más que un accesorio: es un recuerdo, un símbolo, una forma de expresar quién eres. Por eso cada pieza está pensada al detalle, para acompañarte hoy y durante muchos años.</p>
-      <p class="reveal d3">Trabajamos con materiales seleccionados y acabados cuidados, combinando el diseño contemporáneo con la calidez de lo hecho a mano. Elegancia sencilla, para el día a día y para las ocasiones que importan.</p>
+      <h2 class="display reveal d1" id="aboutTitle">Belleza que perdura</h2>
+      <p class="reveal d2" id="aboutP1">En ORNATA creemos que una joya es mucho más que un accesorio: es un recuerdo, un símbolo, una forma de expresar quién eres. Por eso cada pieza está pensada al detalle, para acompañarte hoy y durante muchos años.</p>
+      <p class="reveal d3" id="aboutP2">Trabajamos con materiales seleccionados y acabados cuidados, combinando el diseño contemporáneo con la calidez de lo hecho a mano. Elegancia sencilla, para el día a día y para las ocasiones que importan.</p>
       <p class="about-sign reveal d4">— El equipo de ORNATA</p>
       <div class="stat-row reveal d5">
         <div class="stat"><b data-count="100">0</b><small>Diseños únicos</small></div>
@@ -661,16 +710,14 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
       </div>
       <div class="foot-col">
         <h4>Escríbenos</h4>
-        <p>WhatsApp: +51 962 735 650</p>
-        <a href="https://www.instagram.com/ornatajewelrype" target="_blank" rel="noopener">@ornatajewelrype</a>
-        <a href="admin.html">⚙ Panel de administración</a>
-        <p>◇ Tu correo / ciudad (opcional)</p>
+        <p id="footWa">WhatsApp: +51 962 735 650</p>
+        <a href="https://www.instagram.com/ornatajewelrype" target="_blank" rel="noopener" id="footIg">@ornatajewelrype</a>
+        <p id="footCity" hidden></p>
         <div class="socials">
           <a href="https://www.instagram.com/ornatajewelrype" target="_blank" rel="noopener" aria-label="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg></a>
         </div>
       </div>
     </div>
-    <div class="foot-note">◇ <strong>Nota:</strong> las fotos y precios se administran desde el <a href="admin.html" style="color:var(--gold-soft)">Panel de administración</a>. Sube tus imágenes, pon los precios reales y edita los nombres cuando quieras.</div>
     <div class="foot-bottom">
       <span>© 2026 ORNATA Jewelry. Todas las piezas, con amor.</span>
       <span>Diseño premium con animaciones de scroll</span>
@@ -862,6 +909,7 @@ document.getElementById('placeOrderBtn').addEventListener('click',()=>{
 
 // init — carga de la nube (Firebase) si está configurada; si no, modo local
 async function initStore(){
+  let aboutImg=null;
   if(window.OrnataDB && OrnataDB.enabled){
     try{
       const data=await OrnataDB.load();
@@ -871,9 +919,25 @@ async function initStore(){
       }
       const imgs=await OrnataDB.loadImages();
       PRODUCTS.forEach(p=>{ if(imgs[p.id]) p._dataimg=imgs[p.id]; });
+      if(imgs['__about__']) aboutImg=imgs['__about__'];
     }catch(e){ console.warn('No se pudo cargar de la nube, usando datos locales:',e); }
   }
+  applyContent(aboutImg);
   renderFilters();renderGrid();updateCartUI();
+}
+function applyContent(aboutImg){
+  const setTxt=(id,v)=>{ if(v){ const el=document.getElementById(id); if(el) el.textContent=v; } };
+  setTxt('heroEyebrow',CFG.heroEyebrow);
+  setTxt('heroT1',CFG.heroT1);
+  setTxt('heroT2',CFG.heroT2);
+  setTxt('heroSub',CFG.heroSub);
+  setTxt('aboutTitle',CFG.aboutTitle);
+  setTxt('aboutP1',CFG.aboutP1);
+  setTxt('aboutP2',CFG.aboutP2);
+  if(aboutImg){ const av=document.getElementById('aboutVisual'); if(av) av.innerHTML='<img src="'+aboutImg+'" alt="Nuestra esencia — ORNATA" style="width:100%;height:100%;object-fit:cover">'; }
+  if(CFG.whatsapp){ const fw=document.getElementById('footWa'); if(fw) fw.textContent='WhatsApp: +'+CFG.whatsapp; }
+  if(CFG.instagram){ const fi=document.getElementById('footIg'); if(fi) fi.href=CFG.instagram; }
+  if(CFG.ciudad){ const fc=document.getElementById('footCity'); if(fc){ fc.textContent=CFG.ciudad; fc.hidden=false; } }
 }
 initStore();
 // let collection cards filter the catalogue
