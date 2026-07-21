@@ -258,6 +258,12 @@ if(MODE==='local'){
   document.getElementById('logoutBtn').addEventListener('click',()=>OrnataDB.logout());
   OrnataDB.onAuth(async (user)=>{
     if(user){
+      // Solo el correo del administrador puede administrar
+      var admin=(window.ORNATA_ADMIN_EMAIL||'').trim().toLowerCase();
+      if(admin && (user.email||'').trim().toLowerCase()!==admin){
+        document.getElementById('loginErr').textContent='Esta cuenta no tiene permiso de administrador.';
+        OrnataDB.logout(); return;
+      }
       gate.style.display='none';
       document.getElementById('logoutBtn').style.display='inline-block';
       await loadCloud(); boot();
