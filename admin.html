@@ -228,6 +228,7 @@ function render(){
       <div class="row-actions">
         <button class="mini" data-up="${i}">↑</button>
         <button class="mini" data-down="${i}">↓</button>
+        ${hasImg?`<button class="mini del" data-rmimg="${i}">Quitar foto</button>`:''}
         <button class="mini del" data-del="${i}">Eliminar</button>
       </div>
     </div>`;
@@ -244,6 +245,13 @@ function render(){
     row.querySelector('.thumb').addEventListener('click',()=>pickImage(i));
   });
   rows.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{if(confirm('¿Eliminar este producto?')){const i=+b.dataset.del;const id=products[i].id;delete images[id];if(MODE==='firebase')OrnataDB.deleteImage(id);products.splice(i,1);render();}}));
+  rows.querySelectorAll('[data-rmimg]').forEach(b=>b.addEventListener('click',()=>{
+    const i=+b.dataset.rmimg, id=products[i].id;
+    if(!confirm('¿Quitar la foto de "'+products[i].nombre+'"?'))return;
+    delete images[id]; products[i].img='';
+    if(MODE==='firebase'){ OrnataDB.deleteImage(id).then(()=>{render();flash('Foto eliminada de la nube ✓');}).catch(e=>alert('No se pudo eliminar: '+e.message)); }
+    else { render(); flash('Foto quitada (recuerda Guardar)'); }
+  }));
   rows.querySelectorAll('[data-up]').forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.up;if(i>0){[products[i-1],products[i]]=[products[i],products[i-1]];render();}}));
   rows.querySelectorAll('[data-down]').forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.down;if(i<products.length-1){[products[i+1],products[i]]=[products[i],products[i+1]];render();}}));
 }
