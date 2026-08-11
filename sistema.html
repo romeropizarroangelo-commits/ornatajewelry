@@ -172,6 +172,8 @@
   .gr-sec { padding: 9px 14px 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-3); font-weight: 700; }
   .gr-item { padding: 9px 14px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; align-items: center; border-top: 1px solid var(--line); }
   .gr-item:hover { background: var(--surface-2); }
+  .sres { padding: 11px 14px; cursor: pointer; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .sres:hover, .sres.hl { background: var(--surface-2); }
   .icon-btn {
     width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
     color: var(--ink-2); transition: background .15s;
@@ -447,7 +449,7 @@ const _blob = new Map();
 function norm(s){ return String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,''); }
 function prodBlob(p){
   let b=_blob.get(p.id);
-  if(b==null){ const pn=(p.partNumbers||[]).map(x=>x&&x.numero).join(' '); b=norm([p.codigo,p.codFab,p.desc,p.marca,p.linea,pn].join(' ')); _blob.set(p.id,b); }
+  if(b==null){ const pn=(p.partNumbers||[]).map(x=>x&&x.numero).join(' '); b=norm([p.codigo,p.codFab,p.desc,p.marca,p.linea,p.ubicacion,pn].join(' ')); _blob.set(p.id,b); }
   return b;
 }
 function invalidarBlob(id){ if(id) _blob.delete(id); else _blob.clear(); }
@@ -982,8 +984,9 @@ function productDetail(id){
       ${(p.partNumbers&&p.partNumbers.length)?`<div style="margin-bottom:18px"><div style="font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Números de parte</div><div style="display:flex;flex-wrap:wrap;gap:6px">${p.partNumbers.map(x=>`<span class="badge badge-gray cell-mono">${x.numero}</span>`).join('')}</div></div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px">
         ${detCard('Marca',p.marca||'—')}${detCard('Línea (vehículo)',p.linea||'—')}
-        ${detCard('Origen',p.origen||'—')}${detCard('Unidad',p.um||'—')}
-        ${detCard('Precio mínimo',money2(p.precio,p.moneda))}${detCard('Precio sugerido',money2(p.precioSug,p.moneda))}
+        ${detCard('Origen',p.origen||'—')}${detCard('Ubicación',p.ubicacion||'—')}
+        ${detCard('Precio Mostrador',money2(p.precio,p.moneda))}${detCard('Precio sugerido',money2(p.precioSug,p.moneda))}
+        ${Number(p.precioTaller)>0?detCard('Precio Taller',money2(p.precioTaller,p.moneda)):''}${Number(p.precioFlota)>0?detCard('Precio Flota',money2(p.precioFlota,p.moneda)):''}
       </div>
       <div style="font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Stock por almacén</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:16px 8px">
@@ -1014,8 +1017,11 @@ function productModal(id) {
       <div class="field solo-admin"><label>Costo</label><input id="f_costo" type="number" step="0.01" value="${p.costo||''}"/></div>
       <div class="field"><label>Moneda</label>
         <select id="f_moneda"><option ${p.moneda==='S/'?'selected':''}>S/</option><option ${p.moneda==='$'?'selected':''}>$</option></select></div>
-      <div class="field"><label>Precio venta <span class="req">*</span></label><input id="f_precio" type="number" step="0.01" value="${p.precio||''}"/></div>
+      <div class="field"><label>Precio Mostrador (base) <span class="req">*</span></label><input id="f_precio" type="number" step="0.01" value="${p.precio||''}"/></div>
       <div class="field"><label>Precio sugerido</label><input id="f_precioSug" type="number" step="0.01" value="${p.precioSug||''}"/></div>
+      <div class="field"><label>Precio Taller</label><input id="f_precioTaller" type="number" step="0.01" value="${p.precioTaller||''}"/></div>
+      <div class="field"><label>Precio Flota</label><input id="f_precioFlota" type="number" step="0.01" value="${p.precioFlota||''}"/></div>
+      <div class="field full"><label>Ubicación física (zona / estante / nivel)</label><input id="f_ubicacion" value="${p.ubicacion||''}" placeholder="Ej. Z1-E3-N2"/></div>
       <div class="field"><label>Stock Principal</label><input id="f_pri" type="number" value="${p.pri||0}"/></div>
       <div class="field"><label>Stock Cieneguilla</label><input id="f_cie" type="number" value="${p.cie||0}"/></div>
       <div class="field"><label>Stock Vitrina</label><input id="f_vit" type="number" value="${p.vit||0}"/></div>
@@ -1031,7 +1037,8 @@ function productModal(id) {
     const partNumbers=(document.getElementById('f_partnumbers').value||'').split('\n').map(s=>s.trim()).filter(Boolean).map(numero=>({numero,tipo:'Alternativo'}));
     const data = { codigo, codFab:val('f_codFab'), desc, marca:val('f_marca'), linea:val('f_linea'), origen:val('f_origen'),
       um:val('f_um'), costo:parseFloat(val('f_costo'))||0, moneda:val('f_moneda'), precio:parseFloat(precio)||0,
-      precioSug:parseFloat(val('f_precioSug'))||0, stock:pri+cie+vit, stockMin:parseInt(val('f_stockMin'))||0, pri, cie, vit, mer, partNumbers };
+      precioSug:parseFloat(val('f_precioSug'))||0, precioTaller:parseFloat(val('f_precioTaller'))||0, precioFlota:parseFloat(val('f_precioFlota'))||0,
+      ubicacion:val('f_ubicacion'), stock:pri+cie+vit, stockMin:parseInt(val('f_stockMin'))||0, pri, cie, vit, mer, partNumbers };
     if(id){ Object.assign(DB.productos.find(x=>x.id===id), data); invalidarBlob(id); toast('Producto actualizado','success'); }
     else { DB.productos.unshift({ id:uid(), ...data }); toast('Producto agregado','success'); }
     save(); renderProdTable(); renderNav(); return true;
@@ -1119,10 +1126,11 @@ function clienteModal(id){
       <div class="field"><label>Teléfono</label><input id="c_tel" value="${c.tel||''}"/></div>
       <div class="field"><label>Email</label><input id="c_email" value="${c.email||''}"/></div>
       <div class="field"><label>Línea de crédito (S/)</label><input id="c_credito" type="number" value="${c.credito||0}"/></div>
+      <div class="field"><label>Nivel de precio</label><select id="c_nivel">${Object.keys(NIVELES).map(k=>`<option value="${k}" ${(c.nivelPrecio||'mostrador')===k?'selected':''}>${NIVELES[k]}</option>`).join('')}</select></div>
       <div class="field full"><label>Dirección</label><input id="c_dir" value="${c.dir||''}"/></div>
     </div>`,()=>{
     const nombre=val('c_nombre'); if(!nombre){toast('El nombre es obligatorio','error');return false;}
-    const data={tipoDoc:val('c_tipo'),doc:val('c_doc'),nombre,contacto:val('c_contacto'),tel:val('c_tel'),email:val('c_email'),credito:parseFloat(val('c_credito'))||0,dir:val('c_dir')};
+    const data={tipoDoc:val('c_tipo'),doc:val('c_doc'),nombre,contacto:val('c_contacto'),tel:val('c_tel'),email:val('c_email'),credito:parseFloat(val('c_credito'))||0,nivelPrecio:val('c_nivel'),dir:val('c_dir')};
     if(id){Object.assign(DB.clientes.find(x=>x.id===id),data);toast('Cliente actualizado','success');}
     else{DB.clientes.unshift({id:uid(),...data});toast('Cliente agregado','success');}
     save();renderCliTable();renderNav();return true;
@@ -1226,7 +1234,15 @@ function renderNuevaVenta(){
   venta={ tipo:'Factura', clienteId: DB.clientes[0]?.id||null, lines:[], metodo:'Contado', tc:tcActual(), search:'', fromCotiz:'' };
   drawVenta();
 }
-function ventaPrecioSoles(p){ return p.moneda==='$' ? (Number(p.precio)||0)*(Number(venta.tc)||1) : (Number(p.precio)||0); }
+// Niveles de precio: mostrador (base) / taller / flota. El cliente tiene un nivel asignado.
+const NIVELES = { mostrador:'Mostrador', taller:'Taller', flota:'Flota' };
+function precioNivel(p, nivel){
+  if(nivel==='taller' && Number(p.precioTaller)>0) return Number(p.precioTaller);
+  if(nivel==='flota' && Number(p.precioFlota)>0) return Number(p.precioFlota);
+  return Number(p.precio)||0;
+}
+function clienteNivel(clienteId){ const c=DB.clientes.find(x=>x.id===clienteId); return (c&&c.nivelPrecio)||'mostrador'; }
+function ventaPrecioSoles(p){ const base=precioNivel(p, clienteNivel(venta.clienteId)); return p.moneda==='$' ? base*(Number(venta.tc)||1) : base; }
 function loadCotizIntoVenta(id){
   const c=DB.cotizaciones.find(x=>x.id===id); if(!c) return;
   venta.clienteId=c.clienteId; venta.tc=Number(c.tc)||venta.tc; venta.fromCotiz=c.num;
@@ -1253,9 +1269,9 @@ function drawVenta(){
         <div class="search" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input id="ventaSearch" placeholder="O busca un producto para agregar manualmente..." value="${venta.search||''}" autocomplete="off"/></div>
         ${results.length?`<div style="position:absolute;left:16px;right:16px;z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg);margin-top:6px;overflow:hidden;max-height:340px;overflow-y:auto">
-          ${results.map(p=>`<div data-add="${p.id}" style="padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:center" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
-            <div style="min-width:0"><div class="cell-strong">${p.desc}</div><div class="cell-mono" style="color:var(--ink-3);font-size:11.5px">${p.codigo} · ${p.marca||''} · disp ${disponible(p)}</div></div>
-            <div class="cell-strong" style="white-space:nowrap">${money2(p.precio,p.moneda)}</div></div>`).join('')}
+          ${results.map((p,i)=>`<div class="sres ${i===(venta.hl||0)?'hl':''}" data-add="${p.id}">
+            <div style="min-width:0"><div class="cell-strong">${p.desc}</div><div class="cell-mono" style="color:var(--ink-3);font-size:11.5px">${p.codigo} · ${p.marca||''} · disp ${disponible(p)}${p.ubicacion?' · 📍'+p.ubicacion:''}</div></div>
+            <div class="cell-strong" style="white-space:nowrap">${money2(precioNivel(p,clienteNivel(venta.clienteId)),p.moneda)}</div></div>`).join('')}
         </div>`:''}
       </div>
       <div class="table-wrap"><table><thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">Valor Vta (S/)</th><th style="text-align:right">Importe</th><th></th></tr></thead><tbody>
@@ -1272,7 +1288,7 @@ function drawVenta(){
         <div class="field"><label>Tipo</label><select id="ventaTipo"><option ${venta.tipo==='Factura'?'selected':''}>Factura</option><option ${venta.tipo==='Boleta'?'selected':''}>Boleta</option></select></div>
         <div class="field"><label>Condición</label><select id="ventaMet"><option ${venta.metodo==='Contado'?'selected':''}>Contado</option><option ${venta.metodo==='Crédito'?'selected':''}>Crédito</option></select></div>
       </div>
-      <div class="field" style="margin-bottom:12px"><label>Cliente</label>
+      <div class="field" style="margin-bottom:12px"><label>Cliente · <span style="color:var(--brand)">precio ${NIVELES[clienteNivel(venta.clienteId)]}</span></label>
         <select id="ventaCli">${DB.clientes.map(c=>`<option value="${c.id}" ${venta.clienteId===c.id?'selected':''}>${c.nombre}</option>`).join('')}</select></div>
       <div class="field" style="margin-bottom:16px"><label>Tipo de cambio (US$ → S/)</label><input id="ventaTC" type="number" step="0.001" value="${venta.tc}"/></div>
       <div class="summ-row"><span>Base imponible</span><span>${money(base)}</span></div>
@@ -1283,11 +1299,17 @@ function drawVenta(){
   </div>`;
   document.getElementById('ventaCargarCot').onclick=()=>{ const sel=document.getElementById('ventaCotiz').value; if(sel) loadCotizIntoVenta(sel); else toast('Elige una cotización','error'); };
   const si=document.getElementById('ventaSearch');
-  si.oninput=()=>{ venta.search=si.value; drawVenta(); const el=document.getElementById('ventaSearch'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } };
-  si.onkeydown=(e)=>{ if(e.key==='Enter' && results.length){ e.preventDefault(); const id=results[0].id, ex=venta.lines.find(l=>l.prodId===id); if(ex)ex.cant++; else {const p=DB.productos.find(x=>x.id===id);venta.lines.push({prodId:id,cant:1,valor:ventaPrecioSoles(p),edited:false});} venta.search=''; drawVenta(); } };
+  si.oninput=()=>{ venta.search=si.value; venta.hl=0; drawVenta(); const el=document.getElementById('ventaSearch'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } };
+  si.onkeydown=(e)=>{
+    if(!results.length) return;
+    const refoc=()=>{ const el=document.getElementById('ventaSearch'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } };
+    if(e.key==='ArrowDown'){ e.preventDefault(); venta.hl=Math.min((venta.hl||0)+1, results.length-1); drawVenta(); refoc(); return; }
+    if(e.key==='ArrowUp'){ e.preventDefault(); venta.hl=Math.max((venta.hl||0)-1, 0); drawVenta(); refoc(); return; }
+    if(e.key==='Enter'){ e.preventDefault(); const id=results[venta.hl||0].id, ex=venta.lines.find(l=>l.prodId===id); if(ex)ex.cant++; else {const p=DB.productos.find(x=>x.id===id);venta.lines.push({prodId:id,cant:1,valor:ventaPrecioSoles(p),edited:false});} venta.search=''; venta.hl=0; drawVenta(); }
+  };
   b.querySelectorAll('[data-add]').forEach(r=>r.onclick=()=>{ const id=r.dataset.add; const ex=venta.lines.find(l=>l.prodId===id); if(ex)ex.cant++; else {const p=DB.productos.find(x=>x.id===id);venta.lines.push({prodId:id,cant:1,valor:ventaPrecioSoles(p),edited:false});} venta.search=''; drawVenta(); });
   document.getElementById('ventaTipo').onchange=(e)=>{venta.tipo=e.target.value;drawVenta();};
-  document.getElementById('ventaCli').onchange=(e)=>venta.clienteId=e.target.value;
+  document.getElementById('ventaCli').onchange=(e)=>{ venta.clienteId=e.target.value; drawVenta(); };
   document.getElementById('ventaMet').onchange=(e)=>venta.metodo=e.target.value;
   document.getElementById('ventaTC').onchange=(e)=>{ venta.tc=parseFloat(e.target.value)||1; drawVenta(); };
   b.querySelectorAll('[data-qty]').forEach(inp=>inp.onchange=()=>{let v=parseInt(inp.value)||1;if(v<1)v=1;venta.lines[inp.dataset.qty].cant=v;drawVenta();});
@@ -1776,7 +1798,7 @@ function editCotiz(id){
   drawCotiz();
   toast('Editando '+c.num,'success');
 }
-function cotizValor(p){ const tc=Number(cotiz.tc)||1; if(cotiz.moneda==='US$') return p.moneda==='$'?(Number(p.precio)||0):(Number(p.precio)||0)/tc; return p.moneda==='$'?(Number(p.precio)||0)*tc:(Number(p.precio)||0); }
+function cotizValor(p){ const tc=Number(cotiz.tc)||1; const base=precioNivel(p, clienteNivel(cotiz.clienteId)); if(cotiz.moneda==='US$') return p.moneda==='$'?base:base/tc; return p.moneda==='$'?base*tc:base; }
 function drawCotiz(){
   const b=document.getElementById('cotizBody');
   const sym=cotiz.moneda;
@@ -1794,8 +1816,8 @@ function drawCotiz(){
         <div class="search" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input id="cotizSearch" placeholder="Buscar por código o descripción (elige la marca)..." value="${cotiz.search||''}" autocomplete="off"/></div>
         ${results.length?`<div style="position:absolute;left:16px;right:16px;z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg);margin-top:6px;overflow:hidden;max-height:360px;overflow-y:auto">
-          ${results.map(p=>`<div data-add="${p.id}" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background=''">
-            <div style="min-width:0"><div class="cell-strong">${p.desc}</div><div class="cell-mono" style="color:var(--ink-3);font-size:11.5px">${p.codigo} · <b style="color:var(--brand)">${p.marca||''}</b> · disp ${disponible(p)}</div></div>
+          ${results.map((p,i)=>`<div class="sres ${i===(cotiz.hl||0)?'hl':''}" data-add="${p.id}">
+            <div style="min-width:0"><div class="cell-strong">${p.desc}</div><div class="cell-mono" style="color:var(--ink-3);font-size:11.5px">${p.codigo} · <b style="color:var(--brand)">${p.marca||''}</b> · disp ${disponible(p)}${p.ubicacion?' · 📍'+p.ubicacion:''}</div></div>
             <div style="text-align:right;white-space:nowrap"><div class="cell-strong">${money2(p.precio,p.moneda)}</div>${p.precioSug?`<div style="color:var(--ink-3);font-size:11px">sug ${money2(p.precioSug,p.moneda)}</div>`:''}</div></div>`).join('')}
         </div>`:''}
       </div>
@@ -1809,7 +1831,7 @@ function drawCotiz(){
       </tbody></table></div>
     </div>
     <div class="card cart-summary">
-      <div class="field" style="margin-bottom:12px"><label>Cliente</label><select id="cotizCli">${DB.clientes.map(c=>`<option value="${c.id}" ${cotiz.clienteId===c.id?'selected':''}>${c.nombre}</option>`).join('')}</select></div>
+      <div class="field" style="margin-bottom:12px"><label>Cliente · <span style="color:var(--brand)">precio ${NIVELES[clienteNivel(cotiz.clienteId)]}</span></label><select id="cotizCli">${DB.clientes.map(c=>`<option value="${c.id}" ${cotiz.clienteId===c.id?'selected':''}>${c.nombre}</option>`).join('')}</select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
         <div class="field"><label>Moneda</label><select id="cotizMon"><option value="US$" ${cotiz.moneda==='US$'?'selected':''}>Dólares</option><option value="S/" ${cotiz.moneda==='S/'?'selected':''}>Soles</option></select></div>
         <div class="field"><label>T.C.</label><input id="cotizTC" type="number" step="0.001" value="${cotiz.tc}"/></div>
@@ -1829,10 +1851,16 @@ function drawCotiz(){
       <button class="btn btn-primary" id="emitCotiz" style="width:100%;justify-content:center;margin-top:18px" ${cotiz.lines.length?'':'disabled'}>${ICN.print} Generar cotización</button>
     </div></div>`;
   const si=document.getElementById('cotizSearch');
-  si.oninput=()=>{ cotiz.search=si.value; drawCotiz(); const el=document.getElementById('cotizSearch'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} };
-  si.onkeydown=(e)=>{ if(e.key==='Enter' && results.length){ e.preventDefault(); const id=results[0].id, ex=cotiz.lines.find(l=>l.prodId===id); if(ex)ex.cant++; else {const p=DB.productos.find(x=>x.id===id);cotiz.lines.push({prodId:id,cant:1,valor:cotizValor(p),edited:false});} cotiz.search=''; drawCotiz(); } };
+  si.oninput=()=>{ cotiz.search=si.value; cotiz.hl=0; drawCotiz(); const el=document.getElementById('cotizSearch'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} };
+  si.onkeydown=(e)=>{
+    if(!results.length) return;
+    const refoc=()=>{ const el=document.getElementById('cotizSearch'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} };
+    if(e.key==='ArrowDown'){ e.preventDefault(); cotiz.hl=Math.min((cotiz.hl||0)+1, results.length-1); drawCotiz(); refoc(); return; }
+    if(e.key==='ArrowUp'){ e.preventDefault(); cotiz.hl=Math.max((cotiz.hl||0)-1, 0); drawCotiz(); refoc(); return; }
+    if(e.key==='Enter'){ e.preventDefault(); const id=results[cotiz.hl||0].id, ex=cotiz.lines.find(l=>l.prodId===id); if(ex)ex.cant++; else {const p=DB.productos.find(x=>x.id===id);cotiz.lines.push({prodId:id,cant:1,valor:cotizValor(p),edited:false});} cotiz.search=''; cotiz.hl=0; drawCotiz(); }
+  };
   b.querySelectorAll('[data-add]').forEach(r=>r.onclick=()=>{const id=r.dataset.add;const ex=cotiz.lines.find(l=>l.prodId===id);if(ex)ex.cant++;else{const p=DB.productos.find(x=>x.id===id);cotiz.lines.push({prodId:id,cant:1,valor:cotizValor(p),edited:false});}cotiz.search='';drawCotiz();});
-  document.getElementById('cotizCli').onchange=(e)=>cotiz.clienteId=e.target.value;
+  document.getElementById('cotizCli').onchange=(e)=>{ cotiz.clienteId=e.target.value; drawCotiz(); };
   document.getElementById('cotizMon').onchange=(e)=>{cotiz.moneda=e.target.value;drawCotiz();};
   document.getElementById('cotizTC').onchange=(e)=>{cotiz.tc=parseFloat(e.target.value)||1;drawCotiz();};
   document.getElementById('cotizDsc').onchange=(e)=>{cotiz.descuento=parseFloat(e.target.value)||0;drawCotiz();};
