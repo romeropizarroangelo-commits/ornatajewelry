@@ -499,11 +499,14 @@ function seed() {
     gastos: [],
     ordenescompra: [],
     importaciones: [],
+    notasdebito: [],
     series: [
       { tipo:'FACTURA', serie:'F001', ultimo:124 },
       { tipo:'BOLETA', serie:'B001', ultimo:512 },
       { tipo:'COTIZACION', serie:'0001', ultimo:37501 },
       { tipo:'NOTA_CREDITO', serie:'FC01', ultimo:0 },
+      { tipo:'NOTA_DEBITO', serie:'FD01', ultimo:0 },
+      { tipo:'GUIA', serie:'T001', ultimo:0 },
       { tipo:'COMPRA', serie:'F-', ultimo:2205 },
     ],
     usuarios: [
@@ -541,7 +544,7 @@ async function load(){
   const s = seed(); try { await idbSet('db',s); } catch(e){} return s;
 }
 function normalize(d) {
-  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','guias','caja','gastos','ordenescompra','importaciones','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
+  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','notasdebito','guias','caja','gastos','ordenescompra','importaciones','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
   const s = seed();
   if(!Array.isArray(d.tipocambio) || !d.tipocambio.length) d.tipocambio = s.tipocambio;
   d.cat = d.cat || {};
@@ -591,6 +594,8 @@ const SERIES = {
   BOLETA:       { serie:'B001', pad:6, sep:'-' },
   COTIZACION:   { serie:'0001', pad:8, sep:'-' },
   NOTA_CREDITO: { serie:'FC01', pad:6, sep:'-' },
+  NOTA_DEBITO:  { serie:'FD01', pad:6, sep:'-' },
+  GUIA:         { serie:'T001', pad:6, sep:'-' },
   COMPRA:       { serie:'F-',   pad:0, sep:''  },
 };
 function nextNumero(tipo){
@@ -1328,7 +1333,11 @@ function validarStock(lines){
   return faltantes;
 }
 // Crédito del cliente: deuda pendiente + esta venta no debe superar su línea.
-function deudaCliente(clienteId){ return DB.ventas.filter(v=>v.clienteId===clienteId && v.estado==='Pendiente').reduce((s,v)=>s+Number(v.total||0),0); }
+function deudaCliente(clienteId){
+  const vv=DB.ventas.filter(v=>v.clienteId===clienteId && v.estado==='Pendiente').reduce((s,v)=>s+Number(v.total||0),0);
+  const nd=(DB.notasdebito||[]).filter(n=>n.clienteId===clienteId && n.estado==='Pendiente').reduce((s,n)=>s+Number(n.total||0),0);
+  return vv+nd;
+}
 function chequeoCredito(clienteId, total){
   const c=DB.clientes.find(x=>x.id===clienteId); if(!c) return {ok:true};
   const linea=Number(c.credito)||0;
@@ -2292,6 +2301,170 @@ async function grabarNC(){
   document.querySelector('#segNC button[data-t="lista"]').click();
 }
 function printNC(n){ const cli=DB.clientes.find(c=>c.id===n.clienteId)||{nombre:n.cliente}; printDocumento({ tipo:'NOTA DE CREDITO', numero:n.num, cliente:cli, fecha:n.fecha, moneda:'S/', tc:n.tc||3.6, referencia:'Doc. rel.: '+n.ventaNum, nota:'Motivo: '+(n.motivo||'')+(n.observacion?' — '+n.observacion:''), lineas:(n.lineas||[]).map(l=>({desc:l.desc,marca:l.marca||'',cant:l.cant,valor:l.precio})) }); }
+
+/* ---------- NOTA DE DÉBITO ---------- */
+let nd=null;
+VIEWS.notadebito=(el)=>{
+  el.innerHTML=`<div class="page-head"><div><h1>Nota de Débito</h1><p>Cargo adicional al cliente (intereses, penalidades, ajustes)</p></div>
+    <div class="segmented" id="segND"><button data-t="lista" class="active">Emitidas</button><button data-t="nueva">Nueva N. Débito</button></div></div>
+    <div id="ndBody"></div>`;
+  el.querySelectorAll('#segND button').forEach(btn=>btn.onclick=()=>{el.querySelectorAll('#segND button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');btn.dataset.t==='nueva'?renderNDNueva():renderNDLista();});
+  renderNDLista();
+};
+function renderNDLista(){
+  const b=document.getElementById('ndBody');
+  b.innerHTML=`<div class="card"><div class="section-title">Notas de débito emitidas</div><div class="table-wrap">
+    <table><thead><tr><th>Número</th><th>Doc. relacionado</th><th>Cliente</th><th>Fecha</th><th>Motivo</th><th style="text-align:right">Total</th><th></th></tr></thead><tbody>
+    ${DB.notasdebito.map(n=>`<tr><td class="cell-mono cell-strong">${n.num}</td><td class="cell-mono">${n.ventaNum||'—'}</td><td class="cell-strong">${n.cliente}</td><td>${fmtDate(n.fecha)}</td><td><span class="badge badge-gray">${n.motivo||''}</span></td><td style="text-align:right" class="cell-strong">${money(n.total)}</td><td><div class="row-actions"><button class="icon-btn" title="Imprimir" data-pnd="${n.id}">${ICN.print}</button><button class="icon-btn del" data-del="${n.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(7)}
+    </tbody></table></div></div>`;
+  b.querySelectorAll('[data-pnd]').forEach(x=>x.onclick=()=>printND(DB.notasdebito.find(z=>z.id===x.dataset.pnd)));
+  b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>confirmDialog('¿Eliminar nota de débito?','',()=>{DB.notasdebito=DB.notasdebito.filter(z=>z.id!==x.dataset.del);save();renderNDLista();renderNav();toast('Nota de débito eliminada','success');}));
+}
+function renderNDNueva(){ nd={ ventaId:'', clienteId:DB.clientes[0]?.id||null, motivo:'Intereses por mora', lines:[{desc:'',monto:0}] }; drawND(); }
+function drawND(){
+  const b=document.getElementById('ndBody');
+  const base=nd.lines.reduce((s,l)=>s+(Number(l.monto)||0),0), igv=base*0.18, total=base+igv;
+  const ventasSel=DB.ventas.filter(v=>v.estado!=='Anulada');
+  b.innerHTML=`<div class="venta-layout">
+    <div class="card">
+      <div style="padding:16px;border-bottom:1px solid var(--line)"><div class="field"><label>Documento relacionado (opcional)</label>
+        <select id="ndVenta"><option value="">— Sin documento —</option>${ventasSel.map(v=>`<option value="${v.id}" ${nd.ventaId===v.id?'selected':''}>${v.num} · ${v.cliente} · ${money(v.total)}</option>`).join('')}</select></div></div>
+      <div class="section-title" style="border-top:none">Conceptos del cargo</div>
+      <div class="table-wrap"><table><thead><tr><th>Concepto</th><th style="text-align:right">Monto (S/)</th><th></th></tr></thead><tbody>
+      ${nd.lines.map((l,i)=>`<tr><td><input style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)" value="${l.desc||''}" data-ndd="${i}" placeholder="Ej. interés por mora, flete adicional..."/></td>
+        <td style="text-align:right"><input class="qty-input" style="width:110px;text-align:right" type="number" step="0.01" value="${l.monto||''}" data-ndm="${i}"/></td>
+        <td><div class="row-actions"><button class="icon-btn del" data-ndrm="${i}">${ICN.del}</button></div></td></tr>`).join('')}
+      </tbody></table></div>
+      <div style="padding:14px 16px"><button class="btn btn-ghost btn-sm" id="ndAddLine">${ICN.plus} Agregar concepto</button></div>
+    </div>
+    <div class="card cart-summary">
+      <div class="field" style="margin-bottom:12px"><label>Cliente</label><select id="ndCli">${DB.clientes.map(c=>`<option value="${c.id}" ${nd.clienteId===c.id?'selected':''}>${c.nombre}</option>`).join('')}</select></div>
+      <div class="field" style="margin-bottom:16px"><label>Motivo</label><select id="ndMotivo">${['Intereses por mora','Penalidad','Aumento de valor','Flete / gastos','Corrección'].map(m=>`<option ${nd.motivo===m?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div class="summ-row"><span>Subtotal</span><span>${money(base)}</span></div>
+      <div class="summ-row"><span>IGV (18%)</span><span>${money(igv)}</span></div>
+      <div class="summ-row total"><span>Total</span><span>${money(total)}</span></div>
+      <button class="btn btn-primary" id="emitND" style="width:100%;justify-content:center;margin-top:18px" ${base>0?'':'disabled'}>${ICN.check} Grabar N. Débito</button>
+    </div></div>`;
+  document.getElementById('ndVenta').onchange=(e)=>{ const v=DB.ventas.find(x=>x.id===e.target.value); nd.ventaId=e.target.value; if(v) nd.clienteId=v.clienteId; drawND(); };
+  document.getElementById('ndCli').onchange=(e)=>nd.clienteId=e.target.value;
+  document.getElementById('ndMotivo').onchange=(e)=>nd.motivo=e.target.value;
+  document.getElementById('ndAddLine').onclick=()=>{ nd.lines.push({desc:'',monto:0}); drawND(); };
+  b.querySelectorAll('[data-ndd]').forEach(inp=>inp.onchange=()=>{nd.lines[inp.dataset.ndd].desc=inp.value;});
+  b.querySelectorAll('[data-ndm]').forEach(inp=>inp.onchange=()=>{nd.lines[inp.dataset.ndm].monto=parseFloat(inp.value)||0;drawND();});
+  b.querySelectorAll('[data-ndrm]').forEach(x=>x.onclick=()=>{nd.lines.splice(x.dataset.ndrm,1); if(!nd.lines.length)nd.lines.push({desc:'',monto:0}); drawND();});
+  const emit=document.getElementById('emitND'); if(emit && base>0) emit.onclick=grabarND;
+}
+async function grabarND(){
+  if(emitLock) return;
+  const lineas=nd.lines.filter(l=>Number(l.monto)>0).map(l=>({desc:l.desc||'Cargo',monto:Number(l.monto)}));
+  if(!lineas.length){ toast('Agrega al menos un concepto con monto','error'); return; }
+  emitLock=true; const btn=document.getElementById('emitND'); if(btn)btn.disabled=true;
+  const cli=DB.clientes.find(c=>c.id===nd.clienteId)||{};
+  const v=DB.ventas.find(x=>x.id===nd.ventaId);
+  const base=lineas.reduce((s,l)=>s+l.monto,0), igv=base*0.18, total=base+igv;
+  const doc={ id:uid(), num:null, ventaNum:v?v.num:'', fecha:new Date().toISOString().slice(0,10), clienteId:nd.clienteId, cliente:cli.nombre||'—', motivo:nd.motivo, subtotal:base, igv, total, estado:'Pendiente', usuario:usuarioActual(), creado:new Date().toISOString(), lineas };
+  try { await commit(()=>{ doc.num=nextNumero('NOTA_DEBITO'); DB.notasdebito.unshift(doc); }); }
+  catch(e){ emitLock=false; if(btn)btn.disabled=false; toast('No se pudo guardar','error'); return; }
+  renderNav(); printND(doc); toast('Nota de débito '+doc.num+' grabada','success'); emitLock=false;
+  document.querySelector('#segND button[data-t="lista"]').click();
+}
+function printND(n){ const cli=DB.clientes.find(c=>c.id===n.clienteId)||{nombre:n.cliente}; printDocumento({ tipo:'NOTA DE DEBITO', numero:n.num, cliente:cli, fecha:n.fecha, moneda:'S/', tc:3.6, referencia:n.ventaNum?('Doc. rel.: '+n.ventaNum):'', nota:'Motivo: '+(n.motivo||''), lineas:(n.lineas||[]).map(l=>({desc:l.desc,marca:'',cant:1,valor:l.monto})) }); }
+
+/* ---------- GUÍA DE REMISIÓN ---------- */
+let guia=null;
+VIEWS.guiaremision=(el)=>{
+  el.innerHTML=`<div class="page-head"><div><h1>Guía de Remisión</h1><p>Documento de traslado de mercadería (transporte)</p></div>
+    <div class="segmented" id="segGR"><button data-t="lista" class="active">Emitidas</button><button data-t="nueva">Nueva guía</button></div></div>
+    <div id="grBody"></div>`;
+  el.querySelectorAll('#segGR button').forEach(btn=>btn.onclick=()=>{el.querySelectorAll('#segGR button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');btn.dataset.t==='nueva'?renderNuevaGR():renderGRLista();});
+  renderGRLista();
+};
+function renderGRLista(){
+  const b=document.getElementById('grBody');
+  b.innerHTML=`<div class="card"><div class="section-title">Guías emitidas</div><div class="table-wrap">
+    <table><thead><tr><th>Número</th><th>Destinatario</th><th>Fecha</th><th>Motivo</th><th>Placa</th><th></th></tr></thead><tbody>
+    ${DB.guias.map(g=>`<tr><td class="cell-mono cell-strong">${g.num}</td><td class="cell-strong">${g.cliente}</td><td>${fmtDate(g.fecha)}</td><td>${g.motivo||''}</td><td class="cell-mono">${g.placa||'—'}</td><td><div class="row-actions"><button class="icon-btn" title="Imprimir" data-pgr="${g.id}">${ICN.print}</button><button class="icon-btn del" data-del="${g.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(6)}
+    </tbody></table></div></div>`;
+  b.querySelectorAll('[data-pgr]').forEach(x=>x.onclick=()=>printGuia(DB.guias.find(g=>g.id===x.dataset.pgr)));
+  b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>confirmDialog('¿Eliminar guía?','',()=>{DB.guias=DB.guias.filter(g=>g.id!==x.dataset.del);save();renderGRLista();toast('Guía eliminada','success');}));
+}
+function renderNuevaGR(){ guia={ ventaId:'', refVenta:'', clienteId:DB.clientes[0]?.id||null, motivo:'Venta', fecha:new Date().toISOString().slice(0,10), partida:(DB.config&&DB.config.empresa&&DB.config.empresa.direccion)||COMPANY.direccion, llegada:'', transportista:'', rucTransp:'', placa:'', conductor:'', peso:'', lines:[] }; drawGR(); }
+function drawGR(){
+  const b=document.getElementById('grBody');
+  const ventasSel=DB.ventas.filter(v=>v.estado!=='Anulada');
+  b.innerHTML=`<div class="venta-layout">
+    <div class="card">
+      <div style="padding:16px;border-bottom:1px solid var(--line)"><div class="field"><label>Cargar desde venta (opcional)</label>
+        <select id="grVenta"><option value="">— Manual / sin documento —</option>${ventasSel.map(v=>`<option value="${v.id}" ${guia.ventaId===v.id?'selected':''}>${v.num} · ${v.cliente}</option>`).join('')}</select></div></div>
+      <div class="section-title" style="border-top:none">Productos a trasladar ${guia.refVenta?`· <span style="color:var(--brand)">${guia.refVenta}</span>`:''}</div>
+      <div style="padding:16px"><div class="line-add"><select class="filter-select" id="selProdGR" style="flex:1"><option value="">+ Agregar producto...</option>${DB.productos.slice(0,800).map(p=>`<option value="${p.id}">${p.codigo} · ${p.desc}</option>`).join('')}</select></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th></th></tr></thead><tbody>
+      ${guia.lines.length?guia.lines.map((l,i)=>`<tr><td><div class="cell-strong">${l.desc}</div><div class="cell-mono">${l.codigo}</div></td><td style="text-align:center"><input class="qty-input" type="number" min="1" value="${l.cant}" data-grq="${i}"/></td><td><div class="row-actions"><button class="icon-btn del" data-grrm="${i}">${ICN.del}</button></div></td></tr>`).join(''):`<tr><td colspan="3" class="empty" style="padding:30px">Carga una venta o agrega productos a trasladar.</td></tr>`}
+      </tbody></table></div></div>
+    <div class="card cart-summary">
+      <div class="field" style="margin-bottom:12px"><label>Destinatario</label><select id="grCli">${DB.clientes.map(c=>`<option value="${c.id}" ${guia.clienteId===c.id?'selected':''}>${c.nombre}</option>`).join('')}</select></div>
+      <div class="field" style="margin-bottom:12px"><label>Motivo del traslado</label><select id="grMotivo">${['Venta','Traslado entre almacenes','Devolución','Consignación','Otro'].map(m=>`<option ${guia.motivo===m?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div class="field" style="margin-bottom:12px"><label>Fecha de traslado</label><input id="grFecha" type="date" value="${guia.fecha}"/></div>
+      <div class="field" style="margin-bottom:12px"><label>Punto de partida</label><input id="grPartida" value="${guia.partida||''}"/></div>
+      <div class="field" style="margin-bottom:12px"><label>Punto de llegada</label><input id="grLlegada" value="${guia.llegada||''}" placeholder="Dirección de destino"/></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="field"><label>Transportista</label><input id="grTransp" value="${guia.transportista||''}"/></div>
+        <div class="field"><label>RUC transp.</label><input id="grRuc" value="${guia.rucTransp||''}"/></div>
+        <div class="field"><label>Placa</label><input id="grPlaca" value="${guia.placa||''}"/></div>
+        <div class="field"><label>Conductor</label><input id="grConductor" value="${guia.conductor||''}"/></div>
+      </div>
+      <div class="field" style="margin-bottom:16px"><label>Peso bruto (kg)</label><input id="grPeso" value="${guia.peso||''}"/></div>
+      <button class="btn btn-primary" id="emitGR" style="width:100%;justify-content:center" ${guia.lines.length?'':'disabled'}>${ICN.print} Grabar y emitir</button>
+    </div></div>`;
+  document.getElementById('grVenta').onchange=(e)=>{ const v=DB.ventas.find(x=>x.id===e.target.value); guia.ventaId=e.target.value; if(v){ guia.clienteId=v.clienteId; const cli=DB.clientes.find(c=>c.id===v.clienteId); guia.llegada=cli?(cli.dir||''):''; guia.lines=(v.lineas||[]).map(l=>({prodId:l.prodId,codigo:l.codigo,desc:l.desc,cant:l.cant})); guia.refVenta=v.num; } drawGR(); };
+  document.getElementById('selProdGR').onchange=(e)=>{ if(e.target.value){const p=DB.productos.find(x=>x.id===e.target.value);const ex=guia.lines.find(l=>l.prodId===e.target.value);if(ex)ex.cant++;else guia.lines.push({prodId:p.id,codigo:p.codigo,desc:p.desc,cant:1});drawGR();} };
+  document.getElementById('grCli').onchange=(e)=>guia.clienteId=e.target.value;
+  const map={grMotivo:'motivo',grFecha:'fecha',grPartida:'partida',grLlegada:'llegada',grTransp:'transportista',grRuc:'rucTransp',grPlaca:'placa',grConductor:'conductor',grPeso:'peso'};
+  Object.keys(map).forEach(id=>{ const el2=document.getElementById(id); if(el2) el2.onchange=(e)=>guia[map[id]]=e.target.value; });
+  b.querySelectorAll('[data-grq]').forEach(inp=>inp.onchange=()=>{let v=parseInt(inp.value)||1;if(v<1)v=1;guia.lines[inp.dataset.grq].cant=v;});
+  b.querySelectorAll('[data-grrm]').forEach(x=>x.onclick=()=>{guia.lines.splice(x.dataset.grrm,1);drawGR();});
+  const emit=document.getElementById('emitGR'); if(emit&&guia.lines.length)emit.onclick=grabarGR;
+}
+async function grabarGR(){
+  if(emitLock) return; emitLock=true; const btn=document.getElementById('emitGR'); if(btn)btn.disabled=true;
+  const cli=DB.clientes.find(c=>c.id===guia.clienteId)||{};
+  const doc={ id:uid(), num:null, fecha:guia.fecha, clienteId:guia.clienteId, cliente:cli.nombre||'—', motivo:guia.motivo, refVenta:guia.refVenta||'', partida:guia.partida, llegada:guia.llegada, transportista:guia.transportista, rucTransp:guia.rucTransp, placa:guia.placa, conductor:guia.conductor, peso:guia.peso, usuario:usuarioActual(), creado:new Date().toISOString(), lineas:guia.lines.map(l=>({codigo:l.codigo,desc:l.desc,cant:l.cant})) };
+  try { await commit(()=>{ doc.num=nextNumero('GUIA'); DB.guias.unshift(doc); }); }
+  catch(e){ emitLock=false; if(btn)btn.disabled=false; toast('No se pudo guardar la guía','error'); return; }
+  renderNav(); printGuia(doc); toast('Guía '+doc.num+' emitida','success'); emitLock=false;
+  document.querySelector('#segGR button[data-t="lista"]').click();
+}
+function printGuia(g){
+  if(!g) return;
+  const cli=DB.clientes.find(c=>c.id===g.clienteId)||{nombre:g.cliente};
+  const rows=(g.lineas||[]).map((l,i)=>`<tr><td class="c">${i+1}</td><td class="c">${l.cant}</td><td>${l.codigo||''}</td><td>${l.desc||''}</td></tr>`).join('');
+  const w=window.open('','_blank','width=820,height=1000'); if(!w){toast('Permite las ventanas emergentes','error');return;}
+  const logo=(DB.config&&DB.config.logo)||'assets/jl-logo.png';
+  w.document.write(`<html><head><title>Guía ${g.num}</title><meta charset="utf-8"><style>
+    *{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12px;padding:26px;max-width:820px;margin:auto}
+    .top{display:flex;gap:14px;align-items:center;border-bottom:2px solid #111;padding-bottom:12px}
+    .brand img{max-width:130px;max-height:70px}.co{flex:1;text-align:center;line-height:1.4}.co-name{font-size:15px;font-weight:800}
+    .rucbox{width:200px;border:2px solid #111;border-radius:6px;text-align:center;overflow:hidden}
+    .rucbox .ruc{font-weight:800;padding:6px;border-bottom:1px solid #111}.rucbox .tipo{font-weight:800;padding:7px;font-size:13px}.rucbox .num{background:#111;color:#fff;font-weight:800;padding:6px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+    .box{border:1px solid #111;border-radius:6px;padding:10px 12px;line-height:1.7;font-size:11.5px}
+    table.it{width:100%;border-collapse:collapse;margin-top:12px}table.it th{background:#111;color:#fff;padding:7px;font-size:11px;text-align:left;border:1px solid #111}
+    table.it td{padding:6px 8px;border:1px solid #ccc;font-size:11.5px}table.it td.c{text-align:center;width:60px}
+    @media print{body{padding:0}}
+  </style></head><body>
+    <div class="top"><div class="brand"><img src="${logo}" onerror="this.style.display='none'"></div>
+      <div class="co"><div class="co-name">${COMPANY.nombre}</div><div>${COMPANY.direccion}</div><div>${COMPANY.telefonos}</div></div>
+      <div class="rucbox"><div class="ruc">R.U.C. ${COMPANY.ruc}</div><div class="tipo">GUÍA DE REMISIÓN</div><div class="num">${g.num}</div></div></div>
+    <div class="grid">
+      <div class="box"><b>DESTINATARIO:</b> ${cli.nombre||g.cliente||'—'}<br><b>DOC.:</b> ${cli.tipoDoc||''} ${cli.doc||''}<br><b>MOTIVO:</b> ${g.motivo||''}<br>${g.refVenta?`<b>REF.:</b> ${g.refVenta}<br>`:''}<b>FECHA TRASLADO:</b> ${fmtDate(g.fecha)}</div>
+      <div class="box"><b>PARTIDA:</b> ${g.partida||'—'}<br><b>LLEGADA:</b> ${g.llegada||'—'}<br><b>TRANSPORTISTA:</b> ${g.transportista||'—'} ${g.rucTransp?('RUC '+g.rucTransp):''}<br><b>PLACA:</b> ${g.placa||'—'} &nbsp; <b>CONDUCTOR:</b> ${g.conductor||'—'}<br><b>PESO BRUTO:</b> ${g.peso||'—'} kg</div>
+    </div>
+    <table class="it"><thead><tr><th>ITEM</th><th>CANT.</th><th>CÓDIGO</th><th>DESCRIPCIÓN</th></tr></thead><tbody>${rows}</tbody></table>
+    <p style="margin-top:40px;font-size:11px;color:#555;text-align:center">Representación impresa de la Guía de Remisión — ${COMPANY.web}</p>
+    <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`);
+  w.document.close();
+}
 
 /* ---------- REPORTES REALES ---------- */
 VIEWS.repranking=(el)=>{
