@@ -500,6 +500,7 @@ function seed() {
     ordenescompra: [],
     importaciones: [],
     notasdebito: [],
+    letras: [],
     series: [
       { tipo:'FACTURA', serie:'F001', ultimo:124 },
       { tipo:'BOLETA', serie:'B001', ultimo:512 },
@@ -544,7 +545,7 @@ async function load(){
   const s = seed(); try { await idbSet('db',s); } catch(e){} return s;
 }
 function normalize(d) {
-  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','notasdebito','guias','caja','gastos','ordenescompra','importaciones','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
+  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','notasdebito','guias','caja','gastos','ordenescompra','importaciones','letras','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
   const s = seed();
   if(!Array.isArray(d.tipocambio) || !d.tipocambio.length) d.tipocambio = s.tipocambio;
   d.cat = d.cat || {};
@@ -678,6 +679,7 @@ const MENU = [
   ]},
   { id:'cobrar', label:'Cuentas por Cobrar', icon:'cobrar' },
   { id:'pagos', label:'Cuentas por Pagar', icon:'cobrar' },
+  { id:'letras', label:'Letras', icon:'cobrar' },
   { id:'caja', label:'Caja Chica', icon:'money' },
   { key:'reportes', label:'Reportes', icon:'reportes', children:[
     { id:'reportes', label:'Panel de Reportes' },
@@ -2730,6 +2732,66 @@ function recibirImp(id){
       });
     }catch(e){toast('No se pudo recibir','error');return;}
     toast('Importación '+o.num+' recibida · costo aterrizado aplicado','success'); renderImpLista(); renderNav();
+  });
+}
+
+/* ---------- LETRAS (cobrar / pagar a plazo) ---------- */
+let letrasTipo='cobrar';
+function addMonths(dateStr, m){ const parts=String(dateStr||'').split('-').map(Number); const d=new Date(parts[0], (parts[1]-1)+m, parts[2]||1); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function letraEstado(l){ if(l.estado==='Pagada') return 'Pagada'; const hoy=new Date().toISOString().slice(0,10); return (l.fechaVencimiento && l.fechaVencimiento<hoy)?'Vencida':'Pendiente'; }
+// Genera N letras que suman EXACTAMENTE el total; la última ajusta el redondeo. Vencimientos mensuales.
+function generarLetras(montoTotal, n, venc0){
+  n=Math.max(1,Math.floor(n)); montoTotal=Number(montoTotal)||0;
+  const cuota=Math.round(montoTotal/n*100)/100, out=[];
+  for(let i=0;i<n;i++){ const monto = i===n-1 ? Math.round((montoTotal-cuota*(n-1))*100)/100 : cuota; out.push({ monto, fechaVencimiento: addMonths(venc0, i) }); }
+  return out;
+}
+VIEWS.letras=(el)=>{
+  el.innerHTML=`<div class="page-head"><div><h1>Letras</h1><p>Control de pagos a plazo (letras de cambio)</p></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><div class="segmented" id="segLT"><button data-t="cobrar" class="${letrasTipo==='cobrar'?'active':''}">Por Cobrar</button><button data-t="pagar" class="${letrasTipo==='pagar'?'active':''}">Por Pagar</button></div>
+    <button class="btn btn-primary" id="addLetra">${ICN.plus} Nueva letra</button></div></div>
+    <div id="ltBody"></div>`;
+  el.querySelectorAll('#segLT button').forEach(b=>b.onclick=()=>{letrasTipo=b.dataset.t;VIEWS.letras(el);});
+  document.getElementById('addLetra').onclick=()=>letraModal();
+  renderLetras();
+};
+function renderLetras(){
+  const b=document.getElementById('ltBody');
+  const list=DB.letras.filter(l=>l.tipo===letrasTipo).sort((a,b)=>(a.fechaVencimiento||'').localeCompare(b.fechaVencimiento||''));
+  const pend=list.filter(l=>l.estado!=='Pagada').reduce((s,l)=>s+Number(l.monto||0),0);
+  const venc=list.filter(l=>letraEstado(l)==='Vencida').reduce((s,l)=>s+Number(l.monto||0),0);
+  b.innerHTML=`<div class="kpi-grid">
+    ${kpiCard('cobrar','var(--amber)','var(--amber-soft)',letrasTipo==='cobrar'?'Por cobrar en letras':'Por pagar en letras',money(pend),list.filter(l=>l.estado!=='Pagada').length+' letras pendientes',null)}
+    ${kpiCard('alert',venc?'var(--red)':'var(--green)',venc?'var(--red-soft)':'var(--green-soft)','Vencido',money(venc),venc?'requiere atención':'al día',venc?false:null)}
+  </div>
+  <div class="card"><div class="section-title">Letras ${letrasTipo==='cobrar'?'por cobrar':'por pagar'}</div><div class="table-wrap">
+  <table><thead><tr><th>Número</th><th>${letrasTipo==='cobrar'?'Cliente':'Proveedor'}</th><th>Doc.</th><th>Banco</th><th>Emisión</th><th>Vencimiento</th><th style="text-align:right">Monto</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${list.map(l=>{const est=letraEstado(l);const badge=est==='Pagada'?'<span class="badge badge-green">Pagada</span>':est==='Vencida'?'<span class="badge badge-red">Vencida</span>':'<span class="badge badge-amber">Pendiente</span>';return `<tr><td class="cell-mono cell-strong">${l.num}</td><td class="cell-strong">${l.entidad}</td><td class="cell-mono">${l.docRef||'—'}</td><td>${l.banco||'—'}</td><td>${fmtDate(l.fechaEmision)}</td><td>${fmtDate(l.fechaVencimiento)}</td><td style="text-align:right" class="cell-strong">${money(l.monto)}</td><td>${badge}</td>
+    <td><div class="row-actions">${l.estado!=='Pagada'?`<button class="btn btn-primary btn-sm" data-pay="${l.id}">${ICN.check} ${letrasTipo==='cobrar'?'Cobrar':'Pagar'}</button>`:''}<button class="icon-btn del" data-del="${l.id}">${ICN.del}</button></div></td></tr>`;}).join('')||emptyRow(9)}
+  </tbody></table></div></div>`;
+  b.querySelectorAll('[data-pay]').forEach(x=>x.onclick=()=>{ const l=DB.letras.find(z=>z.id===x.dataset.pay); l.estado='Pagada'; l.fechaPago=new Date().toISOString().slice(0,10); save(); renderLetras(); toast('Letra '+l.num+' '+(letrasTipo==='cobrar'?'cobrada':'pagada'),'success'); });
+  b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>confirmDialog('¿Eliminar letra?','',()=>{DB.letras=DB.letras.filter(z=>z.id!==x.dataset.del);save();renderLetras();toast('Letra eliminada','success');}));
+}
+function letraModal(){
+  const hoy=new Date().toISOString().slice(0,10);
+  const entidades = letrasTipo==='cobrar'?DB.clientes:DB.proveedores;
+  openModal('Nueva letra ('+(letrasTipo==='cobrar'?'por cobrar':'por pagar')+')',`<div class="form-grid">
+    <div class="field full"><label>${letrasTipo==='cobrar'?'Cliente':'Proveedor'}</label><select id="lt_ent">${entidades.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')||'<option value="">(sin registros)</option>'}</select></div>
+    <div class="field"><label>Monto total (S/) <span class="req">*</span></label><input id="lt_monto" type="number" step="0.01"/></div>
+    <div class="field"><label>Nº de letras (canje)</label><input id="lt_n" type="number" min="1" max="24" value="1"/></div>
+    <div class="field"><label>1er vencimiento</label><input id="lt_venc" type="date" value="${hoy}"/></div>
+    <div class="field"><label>Banco</label><input id="lt_banco" placeholder="BCP, BBVA..."/></div>
+    <div class="field full"><label>Documento relacionado</label><input id="lt_doc" placeholder="Ej. F001-000123"/></div>
+  </div>`,()=>{
+    const ent=entidades.find(e=>e.id===val('lt_ent'));
+    const montoTotal=parseFloat(val('lt_monto'))||0, n=Math.max(1,parseInt(val('lt_n'))||1);
+    if(montoTotal<=0){toast('Ingresa el monto total','error');return false;}
+    const venc0=val('lt_venc')||hoy, banco=val('lt_banco'), doc=val('lt_doc');
+    const base='LT-'+String(1000+DB.letras.length+1);
+    const cuotas=generarLetras(montoTotal, n, venc0);
+    cuotas.forEach((c,i)=>{ DB.letras.unshift({ id:uid(), num: n>1?(base+'-'+(i+1)+'/'+n):base, tipo:letrasTipo, entidadId:val('lt_ent'), entidad:ent?ent.nombre:'—', docRef:doc, monto:c.monto, fechaEmision:hoy, fechaVencimiento:c.fechaVencimiento, estado:'Pendiente', banco, usuario:usuarioActual() }); });
+    persist().then(()=>{renderLetras();toast(n+' letra(s) generada(s)','success');}).catch(()=>toast('No se pudo guardar','error'));
+    return true;
   });
 }
 
