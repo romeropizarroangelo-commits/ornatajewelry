@@ -496,6 +496,8 @@ function seed() {
     tipocambio: [{ id: uid(), fecha:'2026-07-20', compra:3.585, venta:3.600 }],
     guias: [],
     caja: [],
+    gastos: [],
+    ordenescompra: [],
     series: [
       { tipo:'FACTURA', serie:'F001', ultimo:124 },
       { tipo:'BOLETA', serie:'B001', ultimo:512 },
@@ -538,7 +540,7 @@ async function load(){
   const s = seed(); try { await idbSet('db',s); } catch(e){} return s;
 }
 function normalize(d) {
-  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','guias','caja','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
+  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','guias','caja','gastos','ordenescompra','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
   const s = seed();
   if(!Array.isArray(d.tipocambio) || !d.tipocambio.length) d.tipocambio = s.tipocambio;
   d.cat = d.cat || {};
@@ -646,52 +648,31 @@ const MENU = [
     { id:'lineas', label:'Líneas' },
     { id:'modelos', label:'Modelos' },
     { id:'familias', label:'Familias' },
-    { id:'listaprecios', label:'Lista de Precios' },
-    { id:'tipocambio', label:'Tipo de Cambio' },
     { id:'servicios', label:'Servicios' },
-    { id:'empresas', label:'Empresas' },
+    { id:'tipocambio', label:'Tipo de Cambio' },
     { id:'perfiles', label:'Perfiles / Usuarios', adminOnly:true },
   ]},
   { key:'inventario', label:'Inventario', icon:'inventario', children:[
     { id:'inventario', label:'Stock Actual' },
     { id:'kardex', label:'Kardex' },
     { id:'ajuste', label:'Ajuste de Inventario' },
-    { id:'cierremensual', label:'Cierre Mensual' },
     { id:'guiaremision', label:'Guía de Remisión' },
-    { id:'notaingreso', label:'Nota de Ingreso' },
-    { id:'unioncodigo', label:'Unión de Código' },
   ]},
   { key:'compras', label:'Compras', icon:'compras', children:[
     { id:'ordencompra', label:'Orden de Compra' },
     { id:'facturacompra', label:'Factura de Compra' },
-    { id:'notacreditocompra', label:'Nota de Crédito' },
-    { id:'guiacompra', label:'Guía de Compras' },
     { id:'gastos', label:'Gastos' },
     { id:'importacion', label:'Importación' },
-    { id:'listapedido', label:'Lista de Pedido' },
   ]},
   { key:'ventas', label:'Ventas', icon:'ventas', children:[
     { id:'ventas', label:'Facturación', badge:()=>DB.ventas.length },
     { id:'cotizaciones', label:'Cotizaciones' },
     { id:'notacredito', label:'Nota de Crédito' },
     { id:'notadebito', label:'Nota de Débito' },
-    { id:'descuentos', label:'Solicitudes de Descuento' },
   ]},
-  { key:'cxc', label:'Cuentas por Cobrar', icon:'cobrar', children:[
-    { id:'cobrar', label:'Cobranzas' },
-    { id:'retenciones', label:'Retenciones' },
-    { id:'letrasventa', label:'Letras' },
-  ]},
-  { key:'cxp', label:'Cuentas por Pagar', icon:'cobrar', children:[
-    { id:'pagos', label:'Pagos' },
-    { id:'percepciones', label:'Percepciones' },
-    { id:'letrascompra', label:'Letras' },
-  ]},
-  { key:'caja', label:'Caja Chica', icon:'money', children:[
-    { id:'cajaingreso', label:'Comprobante de Ingreso' },
-    { id:'cajaegreso', label:'Comprobante de Egreso' },
-    { id:'cajacierre', label:'Cierre de Caja' },
-  ]},
+  { id:'cobrar', label:'Cuentas por Cobrar', icon:'cobrar' },
+  { id:'pagos', label:'Cuentas por Pagar', icon:'cobrar' },
+  { id:'caja', label:'Caja Chica', icon:'money' },
   { key:'reportes', label:'Reportes', icon:'reportes', children:[
     { id:'reportes', label:'Panel de Reportes' },
     { id:'repmargen', label:'Rentabilidad / Margen', adminOnly:true },
@@ -701,8 +682,6 @@ const MENU = [
     { id:'repinvvalorizado', label:'Inventario Valorizado' },
     { id:'repstockmuerto', label:'Stock Muerto' },
     { id:'repmovimientos', label:'Movimientos de Productos' },
-    { id:'repcobranza', label:'Cobranzas' },
-    { id:'repcontabilidad', label:'Reg. Ventas / Compras' },
   ]},
   { id:'configuracion', label:'Configuración', icon:'settings', adminOnly:true },
 ];
@@ -754,7 +733,7 @@ function go(view){
   const el = document.getElementById('view');
   el.innerHTML = '';
   if(VIEWS[view]) VIEWS[view](el);
-  else placeholderView(el, meta.label, 'Este módulo ya forma parte del mapa de tu sistema. Lo dejamos listo y lo activamos con tus datos y reglas cuando lo necesites.', meta.icon, ['Registro, consulta y edición de información','Conectado con inventario, ventas y clientes','Exportación a Excel / PDF y reportes']);
+  else placeholderView(el, meta.label, 'Módulo en construcción. Lo estamos desarrollando "de otro nivel" — más potente que en el sistema anterior. Se entrega en las próximas versiones.', meta.icon, ['Registro, consulta y edición completos','Conectado con inventario, ventas, caja y reportes','Auditoría (quién/cuándo) y guardado atómico']);
   window.scrollTo(0,0);
 }
 
@@ -1466,7 +1445,7 @@ function placeholderView(el,title,desc,icon,features){
       <div style="display:inline-flex;flex-direction:column;gap:10px;text-align:left">
         ${features.map(f=>`<div style="display:flex;align-items:center;gap:10px;color:var(--ink-2)"><span style="color:var(--green)">${ICN.check}</span>${f}</div>`).join('')}
       </div>
-      <div style="margin-top:28px"><span class="badge badge-blue">Próximamente</span></div>
+      <div style="margin-top:28px"><span class="badge badge-amber">En desarrollo</span></div>
     </div>`;
 }
 
@@ -2358,6 +2337,118 @@ VIEWS.repmovimientos=(el)=>{
     ${movs.map(m=>`<tr><td>${fmtDate(m.fecha)}</td><td class="cell-strong">${m.desc}</td><td class="cell-mono">${m.codigo}</td><td>${tipoBadge(m.tipo)}</td><td class="cell-mono">${m.doc||''}</td><td style="text-align:center;font-weight:700;color:${m.cant>0?'var(--green)':'var(--red)'}">${m.cant>0?'+'+m.cant:m.cant}</td></tr>`).join('')||`<tr><td colspan="6" class="empty" style="padding:40px">Sin movimientos. Se generan al hacer ventas y compras.</td></tr>`}
     </tbody></table></div></div>`;
 };
+
+/* ---------- GASTOS ---------- */
+VIEWS.gastos=(el)=>{
+  const list=[...DB.gastos];
+  const total=list.reduce((s,g)=>s+Number(g.monto||0),0);
+  const mes=new Date().toISOString().slice(0,7);
+  const totalMes=list.filter(g=>(g.fecha||'').slice(0,7)===mes).reduce((s,g)=>s+Number(g.monto||0),0);
+  el.innerHTML=`<div class="page-head"><div><h1>Gastos</h1><p>Registro de gastos del negocio</p></div>
+    <button class="btn btn-primary" id="addGasto">${ICN.plus} Nuevo gasto</button></div>
+    <div class="kpi-grid">
+      ${kpiCard('cobrar','var(--red)','var(--red-soft)','Gastos del mes',money(totalMes),mes,null)}
+      ${kpiCard('money','var(--purple)','var(--purple-soft)','Gastos totales',money(total),list.length+' registros',null)}
+    </div>
+    <div class="card"><div class="section-title">Historial</div><div class="table-wrap">
+    <table><thead><tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th>Medio</th><th>Usuario</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>
+    ${list.map(g=>`<tr><td>${fmtDate(g.fecha)}</td><td><span class="badge badge-gray">${g.categoria||'—'}</span></td><td class="cell-strong">${g.concepto||''}</td><td>${g.metodo||''}</td><td class="cell-mono">${g.usuario||''}</td><td style="text-align:right" class="cell-strong">${money(g.monto)}</td>
+      <td><div class="row-actions"><button class="icon-btn del" data-del="${g.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(7)}
+    </tbody></table></div></div>`;
+  document.getElementById('addGasto').onclick=()=>gastoModal();
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDialog('¿Eliminar gasto?','',()=>{DB.gastos=DB.gastos.filter(x=>x.id!==b.dataset.del);save();go('gastos');toast('Gasto eliminado','success');}));
+};
+function gastoModal(){
+  const hoy=new Date().toISOString().slice(0,10);
+  openModal('Nuevo gasto',`<div class="form-grid">
+    <div class="field"><label>Fecha</label><input id="g_fecha" type="date" value="${hoy}"/></div>
+    <div class="field"><label>Categoría</label><select id="g_cat">${['Servicios','Sueldos','Alquiler','Transporte','Impuestos','Mantenimiento','Publicidad','Otros'].map(c=>`<option>${c}</option>`).join('')}</select></div>
+    <div class="field full"><label>Concepto <span class="req">*</span></label><input id="g_concepto" placeholder="Ej. recibo de luz, sueldo mecánico..."/></div>
+    <div class="field"><label>Monto (S/) <span class="req">*</span></label><input id="g_monto" type="number" step="0.01"/></div>
+    <div class="field"><label>Medio de pago</label><select id="g_metodo"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Yape/Plin</option></select></div>
+  </div>`,()=>{
+    const concepto=val('g_concepto'), monto=parseFloat(val('g_monto'))||0;
+    if(!concepto||monto<=0){toast('Concepto y monto son obligatorios','error');return false;}
+    DB.gastos.unshift({id:uid(),fecha:val('g_fecha')||hoy,categoria:val('g_cat'),concepto,monto,metodo:val('g_metodo'),usuario:usuarioActual(),creado:new Date().toISOString()});
+    persist().then(()=>{go('gastos');toast('Gasto registrado','success');}).catch(()=>toast('No se pudo guardar','error'));
+    return true;
+  });
+}
+
+/* ---------- ORDEN DE COMPRA ---------- */
+let oc=null;
+VIEWS.ordencompra=(el)=>{
+  el.innerHTML=`<div class="page-head"><div><h1>Orden de Compra</h1><p>Pedidos a proveedores — al recibirlos ingresan el stock</p></div>
+    <div class="segmented" id="segOC"><button data-t="lista" class="active">Historial</button><button data-t="nueva">Nueva orden</button></div></div>
+    <div id="ocBody"></div>`;
+  el.querySelectorAll('#segOC button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#segOC button').forEach(x=>x.classList.remove('active'));b.classList.add('active');b.dataset.t==='nueva'?renderNuevaOC():renderOCLista();});
+  renderOCLista();
+};
+function renderOCLista(){
+  const b=document.getElementById('ocBody');
+  const pend=DB.ordenescompra.filter(o=>o.estado!=='Recibida').reduce((s,o)=>s+Number(o.total||0),0);
+  b.innerHTML=`<div class="kpi-grid">
+      ${kpiCard('compras','var(--brand)','var(--brand-soft)','Órdenes',DB.ordenescompra.length,'total',null)}
+      ${kpiCard('cobrar','var(--amber)','var(--amber-soft)','Pendientes de recibir',money(pend),DB.ordenescompra.filter(o=>o.estado!=='Recibida').length+' órdenes',null)}
+    </div>
+    <div class="card"><div class="section-title">Órdenes de compra</div><div class="table-wrap">
+    <table><thead><tr><th>Número</th><th>Proveedor</th><th>Fecha</th><th style="text-align:center">Ítems</th><th>Estado</th><th style="text-align:right">Total</th><th></th></tr></thead><tbody>
+    ${DB.ordenescompra.map(o=>`<tr><td class="cell-mono cell-strong">${o.num}</td><td class="cell-strong">${o.proveedor}</td><td>${fmtDate(o.fecha)}</td><td style="text-align:center">${o.items}</td><td>${o.estado==='Recibida'?'<span class="badge badge-green">Recibida</span>':'<span class="badge badge-amber">Pendiente</span>'}</td><td style="text-align:right" class="cell-strong">${money(o.total)}</td>
+      <td><div class="row-actions">${o.estado!=='Recibida'?`<button class="btn btn-primary btn-sm" data-recibir="${o.id}">${ICN.check} Recibir</button>`:''}<button class="icon-btn del" data-del="${o.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(7)}
+    </tbody></table></div></div>`;
+  b.querySelectorAll('[data-recibir]').forEach(x=>x.onclick=()=>recibirOC(x.dataset.recibir));
+  b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>confirmDialog('¿Eliminar orden?','',()=>{DB.ordenescompra=DB.ordenescompra.filter(o=>o.id!==x.dataset.del);save();renderOCLista();toast('Orden eliminada','success');}));
+}
+function renderNuevaOC(){ oc={proveedor:DB.proveedores[0]?.nombre||'', lines:[]}; drawOC(); }
+function drawOC(){
+  const b=document.getElementById('ocBody');
+  const total=oc.lines.reduce((s,l)=>s+l.costo*l.cant,0);
+  b.innerHTML=`<div class="venta-layout">
+    <div class="card"><div class="section-title">Detalle de la orden</div>
+      <div style="padding:16px"><div class="line-add"><select class="filter-select" id="selProdOC" style="flex:1"><option value="">+ Agregar producto...</option>${DB.productos.slice(0,800).map(p=>`<option value="${p.id}">${p.codigo} · ${p.desc}</option>`).join('')}</select></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">Costo unit.</th><th style="text-align:right">Importe</th><th></th></tr></thead><tbody>
+      ${oc.lines.length?oc.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId);return `<tr><td><div class="cell-strong">${p.desc}</div><div class="cell-mono">${p.codigo}</div></td>
+        <td style="text-align:center"><input class="qty-input" type="number" min="1" value="${l.cant}" data-ocq="${i}"/></td>
+        <td style="text-align:right"><input class="qty-input" style="width:90px;text-align:right" type="number" step="0.01" value="${l.costo}" data-occ="${i}"/></td>
+        <td style="text-align:right" class="cell-strong">${money(l.costo*l.cant)}</td>
+        <td><div class="row-actions"><button class="icon-btn del" data-ocrm="${i}">${ICN.del}</button></div></td></tr>`;}).join(''):`<tr><td colspan="5" class="empty" style="padding:40px">${ICN.compras}<h3>Sin productos</h3><p>Agrega productos a la orden.</p></td></tr>`}
+      </tbody></table></div></div>
+    <div class="card cart-summary">
+      <div class="field" style="margin-bottom:16px"><label>Proveedor</label><select id="ocProv">${DB.proveedores.map(p=>`<option ${oc.proveedor===p.nombre?'selected':''}>${p.nombre}</option>`).join('')}</select></div>
+      <div class="summ-row total"><span>Total estimado</span><span>${money(total)}</span></div>
+      <button class="btn btn-primary" id="emitOC" style="width:100%;justify-content:center;margin-top:18px" ${oc.lines.length?'':'disabled'}>${ICN.check} Grabar orden</button>
+    </div></div>`;
+  document.getElementById('selProdOC').onchange=(e)=>{if(e.target.value){const p=DB.productos.find(x=>x.id===e.target.value);const ex=oc.lines.find(l=>l.prodId===e.target.value);if(ex)ex.cant++;else oc.lines.push({prodId:e.target.value,cant:1,costo:Number(p.costo)||0});drawOC();}};
+  document.getElementById('ocProv').onchange=(e)=>oc.proveedor=e.target.value;
+  b.querySelectorAll('[data-ocq]').forEach(inp=>inp.onchange=()=>{let v=parseInt(inp.value)||1;if(v<1)v=1;oc.lines[inp.dataset.ocq].cant=v;drawOC();});
+  b.querySelectorAll('[data-occ]').forEach(inp=>inp.onchange=()=>{oc.lines[inp.dataset.occ].costo=parseFloat(inp.value)||0;drawOC();});
+  b.querySelectorAll('[data-ocrm]').forEach(x=>x.onclick=()=>{oc.lines.splice(x.dataset.ocrm,1);drawOC();});
+  const emit=document.getElementById('emitOC'); if(emit&&oc.lines.length)emit.onclick=grabarOC;
+}
+async function grabarOC(){
+  if(emitLock) return; emitLock=true; const btn=document.getElementById('emitOC'); if(btn)btn.disabled=true;
+  const total=oc.lines.reduce((s,l)=>s+l.costo*l.cant,0);
+  const num='OC-'+String(1000+DB.ordenescompra.length+1);
+  const lineas=oc.lines.map(l=>{const p=DB.productos.find(x=>x.id===l.prodId);return {prodId:l.prodId,codigo:p.codigo,desc:p.desc,cant:l.cant,costo:l.costo};});
+  DB.ordenescompra.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:oc.proveedor,items:oc.lines.reduce((s,l)=>s+l.cant,0),total,estado:'Pendiente',usuario:usuarioActual(),creado:new Date().toISOString(),lineas});
+  try{await persist();}catch(e){emitLock=false;if(btn)btn.disabled=false;toast('No se pudo guardar la orden','error');return;}
+  toast('Orden '+num+' grabada','success'); emitLock=false;
+  document.querySelector('#segOC button[data-t="lista"]').click();
+}
+function recibirOC(id){
+  const o=DB.ordenescompra.find(x=>x.id===id); if(!o||o.estado==='Recibida') return;
+  confirmDialog('¿Recibir la orden '+o.num+'?','Ingresará el stock (con costo promedio ponderado), la marcará como Recibida y creará una factura de compra pendiente de pago.',async ()=>{
+    const num='F-'+String(2200+DB.compras.length+6);
+    try{
+      await commit(()=>{
+        (o.lineas||[]).forEach(l=>{ if(l.prodId){ const p=DB.productos.find(x=>x.id===l.prodId); if(p){ const stockPrev=Number(p.stock)||0,costoPrev=Number(p.costo)||0; addStock(p,l.cant); p.costo=(costoPrev>0&&stockPrev>0)?(stockPrev*costoPrev+l.cant*Number(l.costo))/(stockPrev+l.cant):Number(l.costo)||0; recordMov(p,'COMPRA',o.num,l.cant); } } });
+        const oo=DB.ordenescompra.find(x=>x.id===id); if(oo) oo.estado='Recibida';
+        DB.compras.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:o.proveedor,items:o.items,total:o.total,estado:'Pendiente',metodo:'Crédito',usuario:usuarioActual(),creado:new Date().toISOString(),ocNum:o.num});
+      });
+    }catch(e){toast('No se pudo recibir la orden','error');return;}
+    toast('Orden '+o.num+' recibida · stock ingresado','success'); renderOCLista(); renderNav();
+  });
+}
 
 /* ---------- REPORTES GERENCIALES ---------- */
 // Agrega utilidad por producto sobre las ventas no anuladas. Usa el costo snapshot de cada línea.
