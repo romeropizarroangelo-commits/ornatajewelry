@@ -921,6 +921,7 @@ function renderProdTable() {
       <thead><tr>
         <th>Producto</th><th>Código / Reemplazo</th><th>Marca / Línea</th>
         <th style="text-align:center">Origen</th><th style="text-align:right">Precio</th>
+        <th style="text-align:right">P. Mayor</th>
         <th style="text-align:center">Stock</th><th style="width:1%"></th>
       </tr></thead>
       <tbody>
@@ -938,6 +939,7 @@ function renderProdTable() {
               <div class="cell-strong">${money2(p.precio,p.moneda)}</div>
               ${p.precioSug?`<div style="color:var(--ink-3);font-size:11.5px;white-space:nowrap">sug: ${money2(p.precioSug,p.moneda)}</div>`:''}
             </td>
+            <td style="text-align:right;white-space:nowrap" class="cell-strong">${Number(p.precioMayor)>0?money2(p.precioMayor,p.moneda):'<span style="color:var(--ink-3);font-weight:400">—</span>'}</td>
             <td style="text-align:center">${stockBadge(p)}</td>
             <td style="white-space:nowrap;width:1%"><div class="row-actions">
               <button class="icon-btn" title="Ver ficha" data-view2="${p.id}">${ICN.eye}</button>
@@ -985,7 +987,7 @@ function productDetail(id){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px">
         ${detCard('Marca',p.marca||'—')}${detCard('Línea (vehículo)',p.linea||'—')}
         ${detCard('Origen',p.origen||'—')}${detCard('Ubicación',p.ubicacion||'—')}
-        ${detCard('Precio Mostrador',money2(p.precio,p.moneda))}${detCard('Precio sugerido',money2(p.precioSug,p.moneda))}
+        ${detCard('Precio Mostrador',money2(p.precio,p.moneda))}${Number(p.precioMayor)>0?detCard('Precio por Mayor',money2(p.precioMayor,p.moneda)):detCard('Precio sugerido',money2(p.precioSug,p.moneda))}
         ${Number(p.precioTaller)>0?detCard('Precio Taller',money2(p.precioTaller,p.moneda)):''}${Number(p.precioFlota)>0?detCard('Precio Flota',money2(p.precioFlota,p.moneda)):''}
       </div>
       <div style="font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Stock por almacén</div>
@@ -1018,6 +1020,7 @@ function productModal(id) {
       <div class="field"><label>Moneda</label>
         <select id="f_moneda"><option ${p.moneda==='S/'?'selected':''}>S/</option><option ${p.moneda==='$'?'selected':''}>$</option></select></div>
       <div class="field"><label>Precio Mostrador (base) <span class="req">*</span></label><input id="f_precio" type="number" step="0.01" value="${p.precio||''}"/></div>
+      <div class="field"><label>Precio por Mayor (tiendas)</label><input id="f_precioMayor" type="number" step="0.01" value="${p.precioMayor||''}"/></div>
       <div class="field"><label>Precio sugerido</label><input id="f_precioSug" type="number" step="0.01" value="${p.precioSug||''}"/></div>
       <div class="field"><label>Precio Taller</label><input id="f_precioTaller" type="number" step="0.01" value="${p.precioTaller||''}"/></div>
       <div class="field"><label>Precio Flota</label><input id="f_precioFlota" type="number" step="0.01" value="${p.precioFlota||''}"/></div>
@@ -1037,7 +1040,7 @@ function productModal(id) {
     const partNumbers=(document.getElementById('f_partnumbers').value||'').split('\n').map(s=>s.trim()).filter(Boolean).map(numero=>({numero,tipo:'Alternativo'}));
     const data = { codigo, codFab:val('f_codFab'), desc, marca:val('f_marca'), linea:val('f_linea'), origen:val('f_origen'),
       um:val('f_um'), costo:parseFloat(val('f_costo'))||0, moneda:val('f_moneda'), precio:parseFloat(precio)||0,
-      precioSug:parseFloat(val('f_precioSug'))||0, precioTaller:parseFloat(val('f_precioTaller'))||0, precioFlota:parseFloat(val('f_precioFlota'))||0,
+      precioSug:parseFloat(val('f_precioSug'))||0, precioMayor:parseFloat(val('f_precioMayor'))||0, precioTaller:parseFloat(val('f_precioTaller'))||0, precioFlota:parseFloat(val('f_precioFlota'))||0,
       ubicacion:val('f_ubicacion'), stock:pri+cie+vit, stockMin:parseInt(val('f_stockMin'))||0, pri, cie, vit, mer, partNumbers };
     if(id){ Object.assign(DB.productos.find(x=>x.id===id), data); invalidarBlob(id); toast('Producto actualizado','success'); }
     else { DB.productos.unshift({ id:uid(), ...data }); toast('Producto agregado','success'); }
@@ -1046,7 +1049,7 @@ function productModal(id) {
 }
 
 function exportProductos(){
-  const cols=['codigo','codFab','desc','marca','linea','origen','um','costo','moneda','precio','precioSug','stock','stockMin'];
+  const cols=['codigo','codFab','desc','marca','linea','origen','um','costo','moneda','precio','precioSug','precioMayor','precioTaller','precioFlota','ubicacion','stock','stockMin'];
   const rows=[cols.join(',')].concat(DB.productos.map(p=>cols.map(c=>csvCell(p[c])).join(',')));
   downloadCSV('productos.csv', rows.join('\n'));
   toast('Productos exportados a CSV','success');
@@ -1063,7 +1066,7 @@ function importProductos(e){
         if(!cols.length||!cols.join('')) return;
         const o={}; head.forEach((h,i)=>o[h]=cols[i]);
         const pri=parseInt(o.pri)||0, cie=parseInt(o.cie)||0, vit=parseInt(o.vit)||0, mer=parseInt(o.mer)||0;
-        nuevos.push({ id:uid(), codigo:o.codigo||o.codproducto||('IMP-'+nuevos.length), codFab:o.codfab||o.codigoreeim||o.codigoalternativo||'', desc:o.desc||o.descripcion||o.producto||'', marca:o.marca||'', linea:o.linea||'', origen:o.origen||'', um:o.um||'UND', costo:parseFloat(o.costo)||0, moneda:o.moneda||'S/', precio:parseFloat(o.precio)||0, precioSug:parseFloat(o.preciosug)||0, stock:parseInt(o.stock)||parseInt(o.total)||(pri+cie+vit)||0, stockMin:parseInt(o.stockmin)||0, pri, cie, vit, mer });
+        nuevos.push({ id:uid(), codigo:o.codigo||o.codproducto||('IMP-'+nuevos.length), codFab:o.codfab||o.codigoreeim||o.codigoalternativo||'', desc:o.desc||o.descripcion||o.producto||'', marca:o.marca||'', linea:o.linea||'', origen:o.origen||'', um:o.um||'UND', costo:parseFloat(o.costo)||0, moneda:o.moneda||'S/', precio:parseFloat(o.precio)||0, precioSug:parseFloat(o.preciosug)||0, precioMayor:parseFloat(o.preciomayor)||0, precioTaller:parseFloat(o.preciotaller)||0, precioFlota:parseFloat(o.precioflota)||0, ubicacion:o.ubicacion||'', stock:parseInt(o.stock)||parseInt(o.total)||(pri+cie+vit)||0, stockMin:parseInt(o.stockmin)||0, pri, cie, vit, mer });
       });
       const reemplazar = DB.productos.length>0 ? confirm(`Se leyeron ${nuevos.length} productos del archivo.\n\nAceptar = REEMPLAZAR el catálogo actual\nCancelar = AÑADIR a los productos existentes`) : true;
       DB.productos = reemplazar ? nuevos : nuevos.concat(DB.productos);
@@ -1235,8 +1238,9 @@ function renderNuevaVenta(){
   drawVenta();
 }
 // Niveles de precio: mostrador (base) / taller / flota. El cliente tiene un nivel asignado.
-const NIVELES = { mostrador:'Mostrador', taller:'Taller', flota:'Flota' };
+const NIVELES = { mostrador:'Mostrador', mayor:'Por Mayor', taller:'Taller', flota:'Flota' };
 function precioNivel(p, nivel){
+  if(nivel==='mayor' && Number(p.precioMayor)>0) return Number(p.precioMayor);
   if(nivel==='taller' && Number(p.precioTaller)>0) return Number(p.precioTaller);
   if(nivel==='flota' && Number(p.precioFlota)>0) return Number(p.precioFlota);
   return Number(p.precio)||0;
