@@ -416,7 +416,7 @@ const ICN = {
 
 /* ---------- Estado / persistencia ---------- */
 const DB_KEY = 'sgae_db_v1';
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const money = n => 'S/ ' + (Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2, maximumFractionDigits:2});
 const money2 = (n,mon) => (mon||'S/') + ' ' + (Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2, maximumFractionDigits:2});
 function tcActual(){
@@ -461,6 +461,13 @@ function seed() {
     tipocambio: [{ id: uid(), fecha:'2026-07-20', compra:3.585, venta:3.600 }],
     guias: [],
     caja: [],
+    series: [
+      { tipo:'FACTURA', serie:'F001', ultimo:124 },
+      { tipo:'BOLETA', serie:'B001', ultimo:512 },
+      { tipo:'COTIZACION', serie:'0001', ultimo:37501 },
+      { tipo:'NOTA_CREDITO', serie:'FC01', ultimo:0 },
+      { tipo:'COMPRA', serie:'F-', ultimo:2205 },
+    ],
     cat: {
       marcas: ['MANN','BREMBO','NGK','KYB','GATES','SKF','BOSCH','DENSO'].map(n=>({id:uid(),nombre:n})),
       lineas: ['Filtros','Frenos','Encendido','Suspensión','Distribución','Transmisión','Motor','Eléctrico'].map(n=>({id:uid(),nombre:n})),
@@ -492,7 +499,7 @@ async function load(){
   const s = seed(); try { await idbSet('db',s); } catch(e){} return s;
 }
 function normalize(d) {
-  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','guias','caja'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
+  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','guias','caja','series'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
   const s = seed();
   if(!Array.isArray(d.tipocambio) || !d.tipocambio.length) d.tipocambio = s.tipocambio;
   d.cat = d.cat || {};
@@ -505,8 +512,17 @@ function normalize(d) {
    Cada migración: { to: N, up: (d)=>void }. Se corren en orden solo si to > schemaVersion actual.
    Antes de aplicar cualquiera, se guarda copia previa bajo 'db_prev_v<n>' (para poder revertir). */
 const MIGRATIONS = [
-  // Ejemplos futuros (Fase 2+):
-  // { to:2, up:(d)=>{ d.series = d.series || []; } },
+  // v2: correlativos por serie, sembrados desde los documentos existentes (continúa, no reinicia).
+  { to:2, up:(d)=>{
+    d.series = Array.isArray(d.series) ? d.series : [];
+    const tail = (str)=>{ const m=String(str||'').match(/(\d+)\s*$/); return m?parseInt(m[1],10):0; };
+    const bump = (tipo,serie,num)=>{ let e=d.series.find(s=>s.tipo===tipo&&s.serie===serie); if(!e){ e={tipo,serie,ultimo:0}; d.series.push(e); } if(num>e.ultimo) e.ultimo=num; };
+    (d.ventas||[]).forEach(v=>{ const boleta=String(v.num||'').startsWith('B'); bump(boleta?'BOLETA':'FACTURA', boleta?'B001':'F001', tail(v.num)); });
+    (d.cotizaciones||[]).forEach(c=>bump('COTIZACION','0001',tail(c.num)));
+    (d.notascredito||[]).forEach(n=>bump('NOTA_CREDITO','FC01',tail(n.num)));
+    (d.compras||[]).forEach(c=>bump('COMPRA','F-',tail(c.num)));
+    [['FACTURA','F001'],['BOLETA','B001'],['COTIZACION','0001'],['NOTA_CREDITO','FC01'],['COMPRA','F-']].forEach(([t,s])=>bump(t,s,0));
+  }},
 ];
 async function runMigrations(d){
   const from = Number(d.schemaVersion) || 1;
@@ -516,6 +532,24 @@ async function runMigrations(d){
   for(const m of pending){ m.up(d); d.schemaVersion = m.to; }
   d.schemaVersion = SCHEMA_VERSION;
   return d;
+}
+/* Correlativos por serie. nextNumero() DEBE llamarse DENTRO de commit() para que el
+   contador y el documento se guarden (o se reviertan) juntos → sin huecos ni colisiones. */
+const SERIES = {
+  FACTURA:      { serie:'F001', pad:6, sep:'-' },
+  BOLETA:       { serie:'B001', pad:6, sep:'-' },
+  COTIZACION:   { serie:'0001', pad:8, sep:'-' },
+  NOTA_CREDITO: { serie:'FC01', pad:6, sep:'-' },
+  COMPRA:       { serie:'F-',   pad:0, sep:''  },
+};
+function nextNumero(tipo){
+  const cfg=SERIES[tipo]; if(!cfg) throw new Error('tipo de documento desconocido: '+tipo);
+  if(!Array.isArray(DB.series)) DB.series=[];
+  let e=DB.series.find(s=>s.tipo===tipo && s.serie===cfg.serie);
+  if(!e){ e={tipo, serie:cfg.serie, ultimo:0}; DB.series.push(e); }
+  e.ultimo++;
+  const n = cfg.pad ? String(e.ultimo).padStart(cfg.pad,'0') : String(e.ultimo);
+  return cfg.serie + cfg.sep + n;
 }
 function save(){ return idbSet('db',DB).catch(e=>{ console.warn('save error',e); throw e; }); }
 
@@ -1118,7 +1152,19 @@ function renderVentaLista(){
       </tbody></table></div></div>`;
   b.querySelectorAll('[data-print]').forEach(x=>x.onclick=()=>printVenta(DB.ventas.find(v=>v.id===x.dataset.print)));
   b.querySelectorAll('[data-pay]').forEach(x=>x.onclick=()=>{DB.ventas.find(v=>v.id===x.dataset.pay).estado='Pagada';save();renderVentaLista();toast('Venta marcada como pagada','success');});
-  b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>confirmDialog('¿Anular venta?','',()=>{DB.ventas=DB.ventas.filter(v=>v.id!==x.dataset.del);save();renderVentaLista();renderNav();toast('Venta anulada','success');}));
+  b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>{
+    const v=DB.ventas.find(z=>z.id===x.dataset.del); if(!v) return;
+    if(v.estado==='Anulada'){ toast('Esta venta ya está anulada','error'); return; }
+    confirmDialog('¿Anular venta '+v.num+'?','Se marcará como ANULADA (el documento NO se borra) y se repondrá el stock de sus productos.',async ()=>{
+      try {
+        await commit(()=>{
+          (v.lineas||[]).forEach(l=>{ if(l.prodId){ const p=DB.productos.find(pp=>pp.id===l.prodId); if(p){ addStock(p,l.cant); recordMov(p,'AJUSTE','Anulación '+v.num,l.cant); } } });
+          const vv=DB.ventas.find(z=>z.id===v.id); if(vv) vv.estado='Anulada';
+        });
+      } catch(e){ toast('No se pudo anular. Reintenta.','error'); return; }
+      renderVentaLista(); renderNav(); toast('Venta '+v.num+' anulada · stock repuesto','success');
+    });
+  });
 }
 function renderNuevaVenta(){
   venta={ tipo:'Factura', clienteId: DB.clientes[0]?.id||null, lines:[], metodo:'Contado', tc:tcActual(), search:'', fromCotiz:'' };
@@ -1222,10 +1268,11 @@ async function emitirVenta(){
   const cli=DB.clientes.find(c=>c.id===venta.clienteId);
   const base=venta.lines.reduce((s,l)=>s+(Number(l.valor)||0)*l.cant,0);
   const igv=base*0.18, total=base+igv;
-  const num=(venta.tipo==='Boleta'?'B001-':'F001-')+String(100000+DB.ventas.length+25).slice(1);
+  let num;
   const lineas = venta.lines.map(l=>{const p=DB.productos.find(x=>x.id===l.prodId);return {prodId:l.prodId,codigo:p.codigo,desc:p.desc,marca:p.marca||'',cant:l.cant,precio:Number(l.valor)||0};});
   try {
     await commit(()=>{
+      num = nextNumero(venta.tipo==='Boleta'?'BOLETA':'FACTURA');
       venta.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);deductStock(p,l.cant);recordMov(p,'VENTA',num,-l.cant);});
       DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:venta.clienteId, cliente:cli?cli.nombre:'Cliente varios', items:venta.lines.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:venta.metodo==='Crédito'?'Pendiente':'Pagada', metodo:venta.metodo, tc:venta.tc, referencia:venta.fromCotiz||'', lineas });
     });
@@ -1429,9 +1476,10 @@ function drawCompra(){
 async function emitirCompra(){
   if(emitLock) return; emitLock=true; const btn=document.getElementById('emitCompra'); if(btn) btn.disabled=true;
   const total=compra.lines.reduce((s,l)=>s+l.costo*l.cant,0);
-  const num='F-'+String(2200+DB.compras.length+6);
+  let num;
   try {
     await commit(()=>{
+      num = nextNumero('COMPRA');
       compra.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);addStock(p,l.cant);p.costo=l.costo;recordMov(p,'COMPRA',num,l.cant);});
       DB.compras.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:compra.proveedor,items:compra.lines.reduce((s,l)=>s+l.cant,0),total,estado:compra.metodo==='Crédito'?'Pendiente':'Pagada',metodo:compra.metodo});
     });
@@ -1698,14 +1746,16 @@ async function emitirCotiz(){
   const dsctoMonto=sub*(Number(cotiz.descuento)||0)/100;
   const total=(sub-dsctoMonto)*1.18;
   const editing = cotiz.editingId ? DB.cotizaciones.find(x=>x.id===cotiz.editingId) : null;
-  const num = editing ? editing.num : '0001-'+String(37501+DB.cotizaciones.length+1).padStart(8,'0');
-  const doc={ id: editing?editing.id:uid(), num, fecha: editing?editing.fecha:new Date().toISOString().slice(0,10), clienteId:cotiz.clienteId, cliente:cli.nombre||'—', moneda:cotiz.moneda, tc:cotiz.tc, descuento:dsctoMonto, descuentoPct:Number(cotiz.descuento)||0, atencion:cotiz.atencion, vendedor:cotiz.vendedor, referencia:cotiz.referencia, vigencia:cotiz.vigencia, nota:cotiz.nota, items:cotiz.lines.reduce((s,l)=>s+l.cant,0), total, estado: editing?editing.estado:'Vigente', lineas };
+  const doc={ id: editing?editing.id:uid(), num: editing?editing.num:null, fecha: editing?editing.fecha:new Date().toISOString().slice(0,10), clienteId:cotiz.clienteId, cliente:cli.nombre||'—', moneda:cotiz.moneda, tc:cotiz.tc, descuento:dsctoMonto, descuentoPct:Number(cotiz.descuento)||0, atencion:cotiz.atencion, vendedor:cotiz.vendedor, referencia:cotiz.referencia, vigencia:cotiz.vigencia, nota:cotiz.nota, items:cotiz.lines.reduce((s,l)=>s+l.cant,0), total, estado: editing?editing.estado:'Vigente', lineas };
   try {
-    await commit(()=>{ if(editing){ const idx=DB.cotizaciones.findIndex(x=>x.id===editing.id); DB.cotizaciones[idx]=doc; } else { DB.cotizaciones.unshift(doc); } });
+    await commit(()=>{
+      if(!editing) doc.num = nextNumero('COTIZACION');
+      if(editing){ const idx=DB.cotizaciones.findIndex(x=>x.id===editing.id); DB.cotizaciones[idx]=doc; } else { DB.cotizaciones.unshift(doc); }
+    });
   } catch(e){ emitLock=false; if(btn) btn.disabled=false; toast('No se pudo guardar la cotización. Reintenta.','error'); return; }
   renderNav();
   printCotiz(doc);
-  toast('Cotización '+num+(editing?' actualizada':' generada'),'success');
+  toast('Cotización '+doc.num+(editing?' actualizada':' generada'),'success');
   emitLock=false;
   document.querySelector('#segCot button[data-t="lista"]').click();
 }
@@ -1721,9 +1771,10 @@ function cotizAFactura(id){
     if(faltantes.length){ toast('Stock insuficiente — '+faltantes.join(' · '),'error'); return; }
     emitLock=true;
     const base=lineas.reduce((s,l)=>s+l.precio*l.cant,0), igv=base*0.18, total=base+igv;
-    const num='F001-'+String(100000+DB.ventas.length+25).slice(1);
+    let num;
     try {
       await commit(()=>{
+        num = nextNumero('FACTURA');
         conProd.forEach(l=>{ const p=DB.productos.find(x=>x.id===l.prodId); deductStock(p,l.cant); recordMov(p,'VENTA',num,-l.cant); });
         DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:c.clienteId, cliente:c.cliente, items:lineas.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:'Pagada', metodo:'Contado', tc, referencia:c.num, lineas });
       });
@@ -1924,10 +1975,10 @@ async function grabarNC(){
   if(!lineas.length){ toast('Indica al menos una cantidad a acreditar','error'); return; }
   if(emitLock) return; emitLock=true; const btn=document.getElementById('ncGrabar'); if(btn) btn.disabled=true;
   const base=lineas.reduce((s,l)=>s+l.precio*l.cant,0), igv=base*0.18, total=base+igv;
-  const num='FC01-'+String(100000+DB.notascredito.length+1).slice(1);
-  const doc={ id:uid(), num, ventaNum:v.num, fecha:new Date().toISOString().slice(0,10), clienteId:v.clienteId, cliente:v.cliente, motivo:nc.motivo, observacion:nc.observacion, moneda:'S/', tc:nc.tc, subtotal:base, igv, total, lineas };
+  const doc={ id:uid(), num:null, ventaNum:v.num, fecha:new Date().toISOString().slice(0,10), clienteId:v.clienteId, cliente:v.cliente, motivo:nc.motivo, observacion:nc.observacion, moneda:'S/', tc:nc.tc, subtotal:base, igv, total, lineas };
   try {
     await commit(()=>{
+      doc.num = nextNumero('NOTA_CREDITO');
       lineas.forEach(l=>{ if(l.prodId){ const p=DB.productos.find(x=>x.id===l.prodId); if(p){ addStock(p,l.cant); recordMov(p,'AJUSTE','N.Crédito '+v.num,l.cant); } } });
       const totalDevuelto=lineas.reduce((s,l)=>s+l.cant,0), totalVendido=(v.lineas||[]).reduce((s,l)=>s+l.cant,0);
       if(nc.motivo==='Anulación de operación' || totalDevuelto>=totalVendido){ const vv=DB.ventas.find(x=>x.id===v.id); if(vv) vv.estado='Anulada'; }
@@ -1936,7 +1987,7 @@ async function grabarNC(){
   } catch(e){ emitLock=false; if(btn) btn.disabled=false; toast('No se pudo guardar la N. Crédito. Reintenta.','error'); return; }
   renderNav();
   printNC(doc);
-  toast('Nota de crédito '+num+' grabada · stock repuesto','success');
+  toast('Nota de crédito '+doc.num+' grabada · stock repuesto','success');
   emitLock=false;
   document.querySelector('#segNC button[data-t="lista"]').click();
 }
