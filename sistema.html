@@ -423,6 +423,7 @@ const ICN = {
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  whatsapp: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.2-1.7-.9-2-1-.3-.1-.5-.1-.6.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.5-.9-2.1-.2-.5-.4-.5-.6-.5h-.5c-.2 0-.5.1-.7.3-.3.3-.9.9-.9 2.2s1 2.6 1.1 2.7c.1.2 2 3 4.7 4.2.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.5-.3zM12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.9-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-2.9.8.8-2.8-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>',
 };
 
 /* ---------- Estado / persistencia ---------- */
@@ -435,6 +436,27 @@ function tcActual(){
   if(!list || !list.length) return 3.6;
   const sorted = [...list].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
   return Number(sorted[sorted.length-1].venta) || 3.6;
+}
+
+/* ---------- Búsqueda normalizada (Fase 4) ----------
+   norm() ignora guiones/espacios/mayúsculas → 'W712/75' y 'w71275' quedan iguales.
+   Cada producto tiene un "blob" normalizado (código + reemplazo + nº de parte + desc + marca + línea),
+   cacheado por id. La búsqueda parte la consulta en tokens y exige que TODOS estén en el blob
+   (soporta "AMORTIG VOLVO", "últimos 6 dígitos" = subcadena, etc.). */
+const _blob = new Map();
+function norm(s){ return String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function prodBlob(p){
+  let b=_blob.get(p.id);
+  if(b==null){ const pn=(p.partNumbers||[]).map(x=>x&&x.numero).join(' '); b=norm([p.codigo,p.codFab,p.desc,p.marca,p.linea,pn].join(' ')); _blob.set(p.id,b); }
+  return b;
+}
+function invalidarBlob(id){ if(id) _blob.delete(id); else _blob.clear(); }
+function buscarProductos(q, limit){
+  const toks=String(q||'').split(/\s+/).map(norm).filter(Boolean);
+  if(!toks.length) return [];
+  const out=[];
+  for(const p of DB.productos){ const b=prodBlob(p); if(toks.every(t=>b.includes(t))){ out.push(p); if(limit && out.length>=limit) break; } }
+  return out;
 }
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
@@ -879,9 +901,9 @@ function stockBadge(p){ const e=prodEstado(p); const cls=e==='agotado'?'badge-re
 
 const PAGE_SIZE = 50;
 function renderProdTable() {
-  const q = prodFilter.q.toLowerCase().trim();
+  const toks = String(prodFilter.q||'').split(/\s+/).map(norm).filter(Boolean);
   let list = DB.productos.filter(p => {
-    const match = !q || [p.codigo,p.desc,p.marca,p.linea,p.codFab].some(v=>(v||'').toLowerCase().includes(q));
+    const match = !toks.length || toks.every(t=>prodBlob(p).includes(t));
     const est = prodFilter.estado==='todos' || prodEstado(p)===prodFilter.estado;
     return match && est;
   });
@@ -957,6 +979,7 @@ function productDetail(id){
         <div><div style="font-size:17px;font-weight:700;line-height:1.3">${p.desc||'—'}</div>
           <div class="cell-mono" style="color:var(--brand);font-weight:700;margin-top:4px">${p.codigo||''} ${p.codFab?`<span style="color:var(--ink-3)">↔ ${p.codFab}</span>`:''}</div></div>
       </div>
+      ${(p.partNumbers&&p.partNumbers.length)?`<div style="margin-bottom:18px"><div style="font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Números de parte</div><div style="display:flex;flex-wrap:wrap;gap:6px">${p.partNumbers.map(x=>`<span class="badge badge-gray cell-mono">${x.numero}</span>`).join('')}</div></div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px">
         ${detCard('Marca',p.marca||'—')}${detCard('Línea (vehículo)',p.linea||'—')}
         ${detCard('Origen',p.origen||'—')}${detCard('Unidad',p.um||'—')}
@@ -998,15 +1021,18 @@ function productModal(id) {
       <div class="field"><label>Stock Vitrina</label><input id="f_vit" type="number" value="${p.vit||0}"/></div>
       <div class="field"><label>Merma</label><input id="f_mer" type="number" value="${p.mer||0}"/></div>
       <div class="field"><label>Stock mínimo</label><input id="f_stockMin" type="number" value="${p.stockMin||0}"/></div>
+      <div class="field full"><label>Números de parte alternativos (OEM, Bosch, WABCO... — uno por línea)</label>
+        <textarea id="f_partnumbers" rows="3" style="resize:vertical">${(p.partNumbers||[]).map(x=>x&&x.numero).filter(Boolean).join('\n')}</textarea></div>
     </div>
   `, ()=>{
     const codigo=val('f_codigo'), desc=val('f_desc'), precio=val('f_precio');
     if(!codigo||!desc){ toast('Código y descripción son obligatorios','error'); return false; }
     const pri=parseInt(val('f_pri'))||0, cie=parseInt(val('f_cie'))||0, vit=parseInt(val('f_vit'))||0, mer=parseInt(val('f_mer'))||0;
+    const partNumbers=(document.getElementById('f_partnumbers').value||'').split('\n').map(s=>s.trim()).filter(Boolean).map(numero=>({numero,tipo:'Alternativo'}));
     const data = { codigo, codFab:val('f_codFab'), desc, marca:val('f_marca'), linea:val('f_linea'), origen:val('f_origen'),
       um:val('f_um'), costo:parseFloat(val('f_costo'))||0, moneda:val('f_moneda'), precio:parseFloat(precio)||0,
-      precioSug:parseFloat(val('f_precioSug'))||0, stock:pri+cie+vit, stockMin:parseInt(val('f_stockMin'))||0, pri, cie, vit, mer };
-    if(id){ Object.assign(DB.productos.find(x=>x.id===id), data); toast('Producto actualizado','success'); }
+      precioSug:parseFloat(val('f_precioSug'))||0, stock:pri+cie+vit, stockMin:parseInt(val('f_stockMin'))||0, pri, cie, vit, mer, partNumbers };
+    if(id){ Object.assign(DB.productos.find(x=>x.id===id), data); invalidarBlob(id); toast('Producto actualizado','success'); }
     else { DB.productos.unshift({ id:uid(), ...data }); toast('Producto agregado','success'); }
     save(); renderProdTable(); renderNav(); return true;
   });
@@ -1034,6 +1060,7 @@ function importProductos(e){
       });
       const reemplazar = DB.productos.length>0 ? confirm(`Se leyeron ${nuevos.length} productos del archivo.\n\nAceptar = REEMPLAZAR el catálogo actual\nCancelar = AÑADIR a los productos existentes`) : true;
       DB.productos = reemplazar ? nuevos : nuevos.concat(DB.productos);
+      invalidarBlob();
       prodFilter.page=1;
       renderProdTable(); renderNav();
       save()
@@ -1213,7 +1240,7 @@ function drawVenta(){
   const base=venta.lines.reduce((s,l)=>s+(Number(l.valor)||0)*l.cant,0);
   const igv=base*0.18, total=base+igv;
   const q=(venta.search||'').toLowerCase().trim();
-  const results = q ? DB.productos.filter(p=>[p.codigo,p.desc,p.codFab,p.marca].some(v=>(v||'').toLowerCase().includes(q))).slice(0,8) : [];
+  const results = buscarProductos(venta.search, 8);
   b.innerHTML=`<div class="venta-layout">
     <div class="card">
       <div style="padding:16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
@@ -1257,6 +1284,7 @@ function drawVenta(){
   document.getElementById('ventaCargarCot').onclick=()=>{ const sel=document.getElementById('ventaCotiz').value; if(sel) loadCotizIntoVenta(sel); else toast('Elige una cotización','error'); };
   const si=document.getElementById('ventaSearch');
   si.oninput=()=>{ venta.search=si.value; drawVenta(); const el=document.getElementById('ventaSearch'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } };
+  si.onkeydown=(e)=>{ if(e.key==='Enter' && results.length){ e.preventDefault(); const id=results[0].id, ex=venta.lines.find(l=>l.prodId===id); if(ex)ex.cant++; else {const p=DB.productos.find(x=>x.id===id);venta.lines.push({prodId:id,cant:1,valor:ventaPrecioSoles(p),edited:false});} venta.search=''; drawVenta(); } };
   b.querySelectorAll('[data-add]').forEach(r=>r.onclick=()=>{ const id=r.dataset.add; const ex=venta.lines.find(l=>l.prodId===id); if(ex)ex.cant++; else {const p=DB.productos.find(x=>x.id===id);venta.lines.push({prodId:id,cant:1,valor:ventaPrecioSoles(p),edited:false});} venta.search=''; drawVenta(); });
   document.getElementById('ventaTipo').onchange=(e)=>{venta.tipo=e.target.value;drawVenta();};
   document.getElementById('ventaCli').onchange=(e)=>venta.clienteId=e.target.value;
@@ -1706,6 +1734,7 @@ function renderCotizLista(){
       <td style="text-align:center">${c.items}</td><td><span class="badge badge-gray">${c.moneda}</span></td><td>${cotizEstadoBadge(est)}</td><td style="text-align:right" class="cell-strong">${(c.moneda==='US$'?'US$ ':'S/ ')+(Number(c.total)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
       <td><div class="row-actions">
         <button class="icon-btn" title="Imprimir" data-print="${c.id}">${ICN.print}</button>
+        <button class="icon-btn" title="Enviar por WhatsApp" data-wa="${c.id}" style="color:#25D366">${ICN.whatsapp}</button>
         <button class="icon-btn" title="Editar" data-editc="${c.id}">${ICN.edit}</button>
         ${est==='Reservada'?`<button class="icon-btn" title="Liberar reserva" data-lib="${c.id}" style="color:var(--amber)">${ICN.box}</button>`:(est!=='Facturada'?`<button class="icon-btn" title="Reservar stock" data-res="${c.id}">${ICN.box}</button>`:'')}
         ${est!=='Facturada'?`<button class="icon-btn" title="Pasar a factura" data-tov="${c.id}">${ICN.cart}</button>`:''}
@@ -1713,6 +1742,7 @@ function renderCotizLista(){
       </div></td></tr>`;}).join('')||emptyRow(8)}
     </tbody></table></div></div>`;
   b.querySelectorAll('[data-print]').forEach(x=>x.onclick=()=>printCotiz(DB.cotizaciones.find(c=>c.id===x.dataset.print)));
+  b.querySelectorAll('[data-wa]').forEach(x=>x.onclick=()=>whatsappCotiz(DB.cotizaciones.find(c=>c.id===x.dataset.wa)));
   b.querySelectorAll('[data-editc]').forEach(x=>x.onclick=()=>editCotiz(x.dataset.editc));
   b.querySelectorAll('[data-res]').forEach(x=>x.onclick=()=>reservarCotiz(x.dataset.res));
   b.querySelectorAll('[data-lib]').forEach(x=>x.onclick=()=>liberarCotiz(x.dataset.lib));
@@ -1757,7 +1787,7 @@ function drawCotiz(){
   const dsctoMonto=sub*(Number(cotiz.descuento)||0)/100;
   const base=sub-dsctoMonto, igv=base*0.18, total=base+igv;
   const q=(cotiz.search||'').toLowerCase().trim();
-  const results=q?DB.productos.filter(p=>[p.codigo,p.desc,p.codFab,p.marca].some(v=>(v||'').toLowerCase().includes(q))).slice(0,10):[];
+  const results=buscarProductos(cotiz.search,10);
   b.innerHTML=`<div class="venta-layout">
     <div class="card"><div class="section-title">Detalle de la cotización</div>
       <div style="padding:16px;position:relative">
@@ -1800,6 +1830,7 @@ function drawCotiz(){
     </div></div>`;
   const si=document.getElementById('cotizSearch');
   si.oninput=()=>{ cotiz.search=si.value; drawCotiz(); const el=document.getElementById('cotizSearch'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} };
+  si.onkeydown=(e)=>{ if(e.key==='Enter' && results.length){ e.preventDefault(); const id=results[0].id, ex=cotiz.lines.find(l=>l.prodId===id); if(ex)ex.cant++; else {const p=DB.productos.find(x=>x.id===id);cotiz.lines.push({prodId:id,cant:1,valor:cotizValor(p),edited:false});} cotiz.search=''; drawCotiz(); } };
   b.querySelectorAll('[data-add]').forEach(r=>r.onclick=()=>{const id=r.dataset.add;const ex=cotiz.lines.find(l=>l.prodId===id);if(ex)ex.cant++;else{const p=DB.productos.find(x=>x.id===id);cotiz.lines.push({prodId:id,cant:1,valor:cotizValor(p),edited:false});}cotiz.search='';drawCotiz();});
   document.getElementById('cotizCli').onchange=(e)=>cotiz.clienteId=e.target.value;
   document.getElementById('cotizMon').onchange=(e)=>{cotiz.moneda=e.target.value;drawCotiz();};
@@ -1837,6 +1868,18 @@ async function emitirCotiz(){
   document.querySelector('#segCot button[data-t="lista"]').click();
 }
 function printCotiz(c){ const cli=DB.clientes.find(x=>x.id===c.clienteId)||{nombre:c.cliente}; printDocumento({ tipo:'COTIZACION', numero:c.num, cliente:cli, fecha:c.fecha, moneda:c.moneda, tc:c.tc, descuento:c.descuento, atencion:c.atencion, vendedor:c.vendedor, vigencia:c.vigencia, referencia:c.referencia, nota:c.nota, lineas:c.lineas }); }
+function whatsappCotiz(c){
+  if(!c) return;
+  const cli=DB.clientes.find(x=>x.id===c.clienteId)||{};
+  let tel=(cli.tel||'').replace(/[^0-9]/g,''); if(tel.length===9) tel='51'+tel; // Perú
+  const sym=c.moneda==='US$'?'US$':'S/';
+  let msg=`*JL REPUESTOS* — Cotización ${c.num}\n`;
+  if(cli.nombre) msg+=`Cliente: ${cli.nombre}\n`;
+  msg+='\n';
+  (c.lineas||[]).forEach(l=>{ msg+=`• ${l.cant} x ${l.desc} — ${sym} ${(Number(l.valor)*l.cant).toFixed(2)}\n`; });
+  msg+=`\n*TOTAL: ${sym} ${(Number(c.total)||0).toFixed(2)}*`;
+  window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank');
+}
 function cotizAFactura(id){
   const c=DB.cotizaciones.find(x=>x.id===id); if(!c) return;
   confirmDialog('¿Convertir en factura?','Se generará una factura con estos productos y se descontará el stock.',async ()=>{
@@ -2093,7 +2136,7 @@ VIEWS.kardex=(el)=>{
     </div></div><div id="kxBody"></div>`;
   const si=document.getElementById('kxSearch'), box=document.getElementById('kxResults');
   si.oninput=()=>{ const q=si.value.toLowerCase().trim(); if(!q){box.classList.remove('open');return;}
-    const res=DB.productos.filter(p=>[p.codigo,p.desc,p.marca].some(v=>(v||'').toLowerCase().includes(q))).slice(0,8);
+    const res=buscarProductos(si.value,8);
     box.innerHTML=res.map(p=>`<div class="gr-item" data-k="${p.id}"><div><div class="cell-strong">${p.desc}</div><div class="cell-mono" style="color:var(--ink-3);font-size:11.5px">${p.codigo} · stock ${p.stock}</div></div></div>`).join('')||'<div style="padding:16px;color:var(--ink-3)">Sin resultados</div>';
     box.classList.add('open');
     box.querySelectorAll('[data-k]').forEach(r=>r.onclick=()=>{kardexId=r.dataset.k;box.classList.remove('open');si.value='';renderKardex();});
@@ -2130,7 +2173,7 @@ VIEWS.ajuste=(el)=>{
     </tbody></table></div></div>`;
   const si=document.getElementById('ajSearch'), box=document.getElementById('ajResults');
   si.oninput=()=>{ const q=si.value.toLowerCase().trim(); if(!q){box.classList.remove('open');return;}
-    const res=DB.productos.filter(p=>[p.codigo,p.desc,p.marca].some(v=>(v||'').toLowerCase().includes(q))).slice(0,8);
+    const res=buscarProductos(si.value,8);
     box.innerHTML=res.map(p=>`<div class="gr-item" data-a="${p.id}"><div><div class="cell-strong">${p.desc}</div><div class="cell-mono" style="color:var(--ink-3);font-size:11.5px">${p.codigo} · stock ${p.stock}</div></div></div>`).join('')||'<div style="padding:16px;color:var(--ink-3)">Sin resultados</div>';
     box.classList.add('open');
     box.querySelectorAll('[data-a]').forEach(r=>r.onclick=()=>{ajusteId=r.dataset.a;box.classList.remove('open');si.value='';renderAjuste();});
@@ -2335,7 +2378,7 @@ function importarBackup(file){
     let data; try { data=JSON.parse(r.result); } catch(e){ toast('Archivo inválido','error'); return; }
     if(!data || !Array.isArray(data.productos)){ toast('El archivo no parece un backup válido','error'); return; }
     if(!confirm(`Vas a RESTAURAR un backup con ${data.productos.length} productos y ${(data.ventas||[]).length} ventas.\n\nEsto REEMPLAZA todos los datos actuales. ¿Continuar?`)) return;
-    DB = normalize(data);
+    DB = normalize(data); invalidarBlob();
     try { await persist(); } catch(e){ toast('Restaurado en memoria pero no se pudo guardar. Revisa espacio.','error'); }
     applyConfig(); setBrandLogo(); renderNav(); go('dashboard');
     toast('Backup restaurado','success');
@@ -2379,7 +2422,7 @@ function globalSearchRun(qraw){
   const box=document.getElementById('globalResults');
   const q=(qraw||'').toLowerCase().trim();
   if(!q){ closeGlobal(); box.innerHTML=''; return; }
-  const prods=DB.productos.filter(p=>[p.codigo,p.desc,p.codFab,p.marca].some(v=>(v||'').toLowerCase().includes(q))).slice(0,6);
+  const prods=buscarProductos(qraw,6);
   const clis=DB.clientes.filter(c=>[c.nombre,c.doc,c.email].some(v=>(v||'').toLowerCase().includes(q))).slice(0,3);
   const cots=DB.cotizaciones.filter(c=>[c.num,c.cliente].some(v=>(v||'').toLowerCase().includes(q))).slice(0,3);
   let html='';
@@ -2400,6 +2443,9 @@ document.addEventListener('keydown',(e)=>{
   const tag=(document.activeElement&&document.activeElement.tagName)||'';
   if(e.key==='/' && tag!=='INPUT' && tag!=='SELECT' && tag!=='TEXTAREA'){ e.preventDefault(); _gs.focus(); }
   if(e.key==='Escape'){ closeGlobal(); const m=document.getElementById('modal'); if(m) m.classList.remove('open'); }
+  if(!SESSION) return;
+  if(e.key==='F2'){ e.preventDefault(); go('ventas'); setTimeout(()=>{ const nb=document.querySelector('#segV button[data-t="nueva"]'); if(nb) nb.click(); },0); }
+  if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.key==='S')){ const btn=document.getElementById('emitBtn')||document.getElementById('emitCotiz')||document.getElementById('emitCompra')||document.getElementById('ncGrabar'); if(btn){ e.preventDefault(); if(!btn.disabled) btn.click(); } }
 });
 
 /* ================== AUTENTICACIÓN Y ROLES (Fase 2B) ================== */
