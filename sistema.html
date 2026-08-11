@@ -694,10 +694,12 @@ const MENU = [
   ]},
   { key:'reportes', label:'Reportes', icon:'reportes', children:[
     { id:'reportes', label:'Panel de Reportes' },
+    { id:'repmargen', label:'Rentabilidad / Margen', adminOnly:true },
     { id:'repventasnetas', label:'Ventas Netas' },
     { id:'repranking', label:'Ranking de Ventas' },
     { id:'repvendedor', label:'Ventas por Vendedor' },
     { id:'repinvvalorizado', label:'Inventario Valorizado' },
+    { id:'repstockmuerto', label:'Stock Muerto' },
     { id:'repmovimientos', label:'Movimientos de Productos' },
     { id:'repcobranza', label:'Cobranzas' },
     { id:'repcontabilidad', label:'Reg. Ventas / Compras' },
@@ -741,7 +743,7 @@ function renderNav(){
   nav.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k=b.dataset.toggle; navExpanded[k]=!(navExpanded[k]||MENU.find(m=>m.key===k).children.some(c=>c.id===currentView)); renderNav(); });
 }
 
-const ADMIN_VIEWS = new Set(['configuracion','perfiles']);
+const ADMIN_VIEWS = new Set(['configuracion','perfiles','repmargen']);
 function go(view){
   if(ADMIN_VIEWS.has(view) && !esAdmin()){ toast('Solo el administrador puede acceder','error'); view='dashboard'; }
   currentView = view;
@@ -1247,6 +1249,8 @@ function precioNivel(p, nivel){
 }
 function clienteNivel(clienteId){ const c=DB.clientes.find(x=>x.id===clienteId); return (c&&c.nivelPrecio)||'mostrador'; }
 function ventaPrecioSoles(p){ const base=precioNivel(p, clienteNivel(venta.clienteId)); return p.moneda==='$' ? base*(Number(venta.tc)||1) : base; }
+// Costo del producto convertido a soles (para snapshot en la venta y márgenes reales).
+function costoSoles(p, tc){ const c=Number(p.costo)||0; return p.moneda==='$' ? c*(Number(tc)||tcActual()) : c; }
 function loadCotizIntoVenta(id){
   const c=DB.cotizaciones.find(x=>x.id===id); if(!c) return;
   venta.clienteId=c.clienteId; venta.tc=Number(c.tc)||venta.tc; venta.fromCotiz=c.num;
@@ -1368,7 +1372,7 @@ async function emitirVenta(){
   }
   emitLock=true; const btn=document.getElementById('emitBtn'); if(btn) btn.disabled=true;
   let num;
-  const lineas = venta.lines.map(l=>{const p=DB.productos.find(x=>x.id===l.prodId);return {prodId:l.prodId,codigo:p.codigo,desc:p.desc,marca:p.marca||'',cant:l.cant,precio:Number(l.valor)||0};});
+  const lineas = venta.lines.map(l=>{const p=DB.productos.find(x=>x.id===l.prodId);return {prodId:l.prodId,codigo:p.codigo,desc:p.desc,marca:p.marca||'',cant:l.cant,precio:Number(l.valor)||0,costo:costoSoles(p,venta.tc)};});
   try {
     await commit(()=>{
       num = nextNumero(venta.tipo==='Boleta'?'BOLETA':'FACTURA');
@@ -1917,7 +1921,7 @@ function cotizAFactura(id){
   confirmDialog('¿Convertir en factura?','Se generará una factura con estos productos y se descontará el stock.',async ()=>{
     if(emitLock) return;
     const tc=Number(c.tc)||tcActual();
-    const lineas=(c.lineas||[]).map(l=>{ const soles=c.moneda==='US$'?(Number(l.valor)||0)*tc:(Number(l.valor)||0); return {prodId:l.prodId,codigo:l.codigo,desc:l.desc,marca:l.marca||'',cant:l.cant,precio:soles}; });
+    const lineas=(c.lineas||[]).map(l=>{ const soles=c.moneda==='US$'?(Number(l.valor)||0)*tc:(Number(l.valor)||0); const p=DB.productos.find(x=>x.id===l.prodId); return {prodId:l.prodId,codigo:l.codigo,desc:l.desc,marca:l.marca||'',cant:l.cant,precio:soles,costo:p?costoSoles(p,tc):0}; });
     const conProd=lineas.filter(l=>l.prodId && DB.productos.some(p=>p.id===l.prodId));
     const reservada = c.estado==='Reservada';   // esta cotización tiene su propio stock reservado
     // Valida contra el disponible, sumando lo que esta misma cotización tenía reservado (se liberará al facturar).
@@ -2353,6 +2357,66 @@ VIEWS.repmovimientos=(el)=>{
     <div class="card"><div class="section-title">Movimientos (${DB.movimientos.length})</div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Código</th><th>Tipo</th><th>Documento</th><th style="text-align:center">Cant.</th></tr></thead><tbody>
     ${movs.map(m=>`<tr><td>${fmtDate(m.fecha)}</td><td class="cell-strong">${m.desc}</td><td class="cell-mono">${m.codigo}</td><td>${tipoBadge(m.tipo)}</td><td class="cell-mono">${m.doc||''}</td><td style="text-align:center;font-weight:700;color:${m.cant>0?'var(--green)':'var(--red)'}">${m.cant>0?'+'+m.cant:m.cant}</td></tr>`).join('')||`<tr><td colspan="6" class="empty" style="padding:40px">Sin movimientos. Se generan al hacer ventas y compras.</td></tr>`}
     </tbody></table></div></div>`;
+};
+
+/* ---------- REPORTES GERENCIALES ---------- */
+// Agrega utilidad por producto sobre las ventas no anuladas. Usa el costo snapshot de cada línea.
+function agregarRentabilidad(){
+  let ventaTotal=0, costoTotal=0; const porProd={};
+  DB.ventas.filter(v=>v.estado!=='Anulada').forEach(v=>{
+    (v.lineas||[]).forEach(l=>{
+      const ingreso=(Number(l.precio)||0)*l.cant, costo=(Number(l.costo)||0)*l.cant;
+      ventaTotal+=ingreso; costoTotal+=costo;
+      const k=l.codigo||l.desc; if(!porProd[k])porProd[k]={desc:l.desc,codigo:l.codigo,ingreso:0,costo:0,cant:0};
+      porProd[k].ingreso+=ingreso; porProd[k].costo+=costo; porProd[k].cant+=l.cant;
+    });
+  });
+  return { ventaTotal, costoTotal, utilidad:ventaTotal-costoTotal, margen: ventaTotal>0?((ventaTotal-costoTotal)/ventaTotal*100):0, porProd };
+}
+VIEWS.repmargen=(el)=>{
+  const r=agregarRentabilidad();
+  const top=Object.values(r.porProd).map(p=>({...p,util:p.ingreso-p.costo,mg:p.ingreso>0?((p.ingreso-p.costo)/p.ingreso*100):0})).sort((a,b)=>b.util-a.util);
+  const sinCosto=Object.values(r.porProd).filter(p=>p.costo<=0).length;
+  el.innerHTML=`<div class="page-head"><div><h1>Rentabilidad / Margen</h1><p>Utilidad real de tus ventas (ingreso − costo)</p></div></div>
+    <div class="kpi-grid">
+      ${kpiCard('money','var(--brand)','var(--brand-soft)','Ventas (sin IGV)',money(r.ventaTotal),'',null)}
+      ${kpiCard('box','var(--purple)','var(--purple-soft)','Costo de lo vendido',money(r.costoTotal),'',null)}
+      ${kpiCard('money',r.utilidad>=0?'var(--green)':'var(--red)',r.utilidad>=0?'var(--green-soft)':'var(--red-soft)','Utilidad',money(r.utilidad),'margen '+r.margen.toFixed(1)+'%',r.utilidad>=0)}
+    </div>
+    ${sinCosto?`<div class="card" style="padding:14px 18px;margin-bottom:20px;border-left:3px solid var(--amber)"><b>Nota:</b> ${sinCosto} producto(s) vendidos sin costo registrado (margen inflado). El costo real se captura al registrar compras y en ventas nuevas.</div>`:''}
+    <div class="card"><div class="section-title">Utilidad por producto</div><div class="table-wrap">
+      <table><thead><tr><th>Producto</th><th>Código</th><th style="text-align:center">Vend.</th><th style="text-align:right">Ingreso</th><th style="text-align:right">Costo</th><th style="text-align:right">Utilidad</th><th style="text-align:right">Margen</th></tr></thead><tbody>
+      ${top.map(p=>`<tr><td class="cell-strong">${p.desc}</td><td class="cell-mono">${p.codigo||''}</td><td style="text-align:center">${p.cant}</td><td style="text-align:right" class="cell-mono">${money(p.ingreso)}</td><td style="text-align:right" class="cell-mono">${money(p.costo)}</td><td style="text-align:right" class="cell-strong" style="color:${p.util>=0?'var(--green)':'var(--red)'}">${money(p.util)}</td><td style="text-align:right">${p.mg.toFixed(1)}%</td></tr>`).join('')||emptyRow(7)}
+      </tbody></table></div></div>`;
+};
+VIEWS.repvendedor=(el)=>{
+  const porV={};
+  DB.ventas.filter(v=>v.estado!=='Anulada').forEach(v=>{ const u=v.usuario||'(sin usuario)'; if(!porV[u])porV[u]={usuario:u,n:0,total:0}; porV[u].n++; porV[u].total+=Number(v.total||0); });
+  const list=Object.values(porV).sort((a,b)=>b.total-a.total);
+  const nombre=(u)=>{ const us=DB.usuarios.find(x=>x.usuario===u); return us?us.nombre:u; };
+  el.innerHTML=`<div class="page-head"><div><h1>Ventas por Vendedor</h1><p>Rendimiento de cada usuario</p></div></div>
+    ${list.length?`<div class="grid-2" style="margin-bottom:20px">
+      <div class="card"><div class="section-title">Ranking por monto</div><div style="padding:20px">${hbarsSVG(list.slice(0,8).map(v=>[nombre(v.usuario),Math.round(v.total)]))}</div></div>
+      <div class="card"><div class="section-title">Resumen</div><div style="padding:8px 20px 20px">${statRow('Vendedores activos',list.length)}${statRow('Ventas totales',list.reduce((s,v)=>s+v.n,0))}${statRow('Monto total',money(list.reduce((s,v)=>s+v.total,0)))}</div></div>
+    </div>
+    <div class="card"><div class="section-title">Detalle</div><div class="table-wrap"><table><thead><tr><th>Vendedor</th><th>Usuario</th><th style="text-align:center">Nº ventas</th><th style="text-align:right">Monto</th><th style="text-align:right">Ticket prom.</th></tr></thead><tbody>
+    ${list.map(v=>`<tr><td class="cell-strong">${nombre(v.usuario)}</td><td class="cell-mono">${v.usuario}</td><td style="text-align:center">${v.n}</td><td style="text-align:right" class="cell-strong">${money(v.total)}</td><td style="text-align:right" class="cell-mono">${money(v.n?v.total/v.n:0)}</td></tr>`).join('')}
+    </tbody></table></div></div>`:emptyState('Sin ventas aún','Registra ventas para ver el rendimiento por vendedor.')}`;
+};
+VIEWS.repstockmuerto=(el)=>{
+  const vendidos=new Set(); DB.ventas.filter(v=>v.estado!=='Anulada').forEach(v=>(v.lineas||[]).forEach(l=>{ if(l.prodId) vendidos.add(l.prodId); }));
+  const muertos=DB.productos.filter(p=>Number(p.stock)>0 && !vendidos.has(p.id));
+  const TC=tcActual();
+  const valor=muertos.reduce((s,p)=>{ const pv=p.moneda==='$'?(Number(p.precio)||0)*TC:(Number(p.precio)||0); return s+pv*Number(p.stock); },0);
+  el.innerHTML=`<div class="page-head"><div><h1>Stock Muerto</h1><p>Productos con stock que NUNCA se han vendido</p></div></div>
+    <div class="kpi-grid">
+      ${kpiCard('alert', muertos.length?'var(--red)':'var(--green)', muertos.length?'var(--red-soft)':'var(--green-soft)','Productos sin rotación',muertos.length,'de '+DB.productos.length,muertos.length?false:null)}
+      ${kpiCard('box','var(--purple)','var(--purple-soft)','Capital inmovilizado (S/)',money(valor),'a precio de venta',null)}
+    </div>
+    <div class="card"><div class="section-title">Detalle (${muertos.length})</div><div class="table-wrap">
+      <table><thead><tr><th>Producto</th><th>Código</th><th>Marca</th><th style="text-align:center">Stock</th><th style="text-align:right">Precio</th><th>Ubicación</th></tr></thead><tbody>
+      ${muertos.slice(0,300).map(p=>`<tr><td class="cell-strong">${p.desc}</td><td class="cell-mono">${p.codigo}</td><td>${p.marca||'—'}</td><td style="text-align:center">${stockBadge(p)}</td><td style="text-align:right" class="cell-mono">${money2(p.precio,p.moneda)}</td><td class="cell-mono">${p.ubicacion||'—'}</td></tr>`).join('')||`<tr><td colspan="6" class="empty" style="padding:40px">✅ Todos tus productos con stock se han vendido al menos una vez.</td></tr>`}
+      </tbody></table></div>${muertos.length>300?`<div style="padding:12px 16px;color:var(--ink-3);font-size:12px">Mostrando 300 de ${muertos.length}.</div>`:''}</div>`;
 };
 
 /* ---------- Helpers UI ---------- */
