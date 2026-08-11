@@ -314,6 +314,20 @@
 
   .hidden { display: none !important; }
 
+  /* Roles: el vendedor NO ve elementos marcados .solo-admin */
+  .rol-vendedor .solo-admin { display: none !important; }
+
+  /* Login */
+  .login-screen { position: fixed; inset: 0; z-index: 300; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; }
+  .login-screen.open { display: flex; }
+  .login-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-lg); padding: 34px; width: 100%; max-width: 400px; text-align: center; }
+  .login-users { display: flex; flex-direction: column; gap: 10px; }
+  .login-user { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); transition: border-color .15s, background .15s; }
+  .login-user:hover { border-color: var(--brand); background: var(--surface-2); }
+  .pin-box { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .pin-input { width: 180px; text-align: center; font-size: 24px; letter-spacing: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); outline: none; }
+  .pin-input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+
   @media (max-width: 1024px) {
     .grid-2 { grid-template-columns: 1fr; }
     .venta-layout { grid-template-columns: 1fr; }
@@ -345,13 +359,7 @@
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="sidebar-foot">
-      <div class="user-chip">
-        <div class="avatar">A</div>
-        <div>
-          <div class="user-name">Angelo</div>
-          <div class="user-role">Administrador</div>
-        </div>
-      </div>
+      <div class="user-chip" id="userChip"></div>
     </div>
   </aside>
   <div class="scrim" id="scrim"></div>
@@ -381,6 +389,7 @@
 
 <div class="modal-overlay" id="modal"></div>
 <div class="toast-wrap" id="toasts"></div>
+<div id="loginScreen" class="login-screen"></div>
 
 <script>
 /* =====================================================================
@@ -412,11 +421,13 @@ const ICN = {
   print: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
 };
 
 /* ---------- Estado / persistencia ---------- */
 const DB_KEY = 'sgae_db_v1';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const money = n => 'S/ ' + (Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2, maximumFractionDigits:2});
 const money2 = (n,mon) => (mon||'S/') + ' ' + (Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2, maximumFractionDigits:2});
 function tcActual(){
@@ -468,6 +479,10 @@ function seed() {
       { tipo:'NOTA_CREDITO', serie:'FC01', ultimo:0 },
       { tipo:'COMPRA', serie:'F-', ultimo:2205 },
     ],
+    usuarios: [
+      { id:'u-admin', nombre:'Angelo', usuario:'admin', pin:'1234', rol:'admin', activo:true },
+      { id:'u-vend', nombre:'Vendedor', usuario:'vendedor', pin:'0000', rol:'vendedor', activo:true },
+    ],
     cat: {
       marcas: ['MANN','BREMBO','NGK','KYB','GATES','SKF','BOSCH','DENSO'].map(n=>({id:uid(),nombre:n})),
       lineas: ['Filtros','Frenos','Encendido','Suspensión','Distribución','Transmisión','Motor','Eléctrico'].map(n=>({id:uid(),nombre:n})),
@@ -499,7 +514,7 @@ async function load(){
   const s = seed(); try { await idbSet('db',s); } catch(e){} return s;
 }
 function normalize(d) {
-  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','guias','caja','series'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
+  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','guias','caja','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
   const s = seed();
   if(!Array.isArray(d.tipocambio) || !d.tipocambio.length) d.tipocambio = s.tipocambio;
   d.cat = d.cat || {};
@@ -522,6 +537,15 @@ const MIGRATIONS = [
     (d.notascredito||[]).forEach(n=>bump('NOTA_CREDITO','FC01',tail(n.num)));
     (d.compras||[]).forEach(c=>bump('COMPRA','F-',tail(c.num)));
     [['FACTURA','F001'],['BOLETA','B001'],['COTIZACION','0001'],['NOTA_CREDITO','FC01'],['COMPRA','F-']].forEach(([t,s])=>bump(t,s,0));
+  }},
+  // v3: usuarios + roles. Crea un administrador por defecto si no existen.
+  { to:3, up:(d)=>{
+    if(!Array.isArray(d.usuarios) || !d.usuarios.length){
+      d.usuarios = [
+        { id:'u-admin', nombre:'Angelo', usuario:'admin', pin:'1234', rol:'admin', activo:true },
+        { id:'u-vend', nombre:'Vendedor', usuario:'vendedor', pin:'0000', rol:'vendedor', activo:true },
+      ];
+    }
   }},
 ];
 async function runMigrations(d){
@@ -602,7 +626,7 @@ const MENU = [
     { id:'tipocambio', label:'Tipo de Cambio' },
     { id:'servicios', label:'Servicios' },
     { id:'empresas', label:'Empresas' },
-    { id:'perfiles', label:'Perfiles / Usuarios' },
+    { id:'perfiles', label:'Perfiles / Usuarios', adminOnly:true },
   ]},
   { key:'inventario', label:'Inventario', icon:'inventario', children:[
     { id:'inventario', label:'Stock Actual' },
@@ -654,7 +678,7 @@ const MENU = [
     { id:'repcobranza', label:'Cobranzas' },
     { id:'repcontabilidad', label:'Reg. Ventas / Compras' },
   ]},
-  { id:'configuracion', label:'Configuración', icon:'settings' },
+  { id:'configuracion', label:'Configuración', icon:'settings', adminOnly:true },
 ];
 
 // Metadatos planos (id -> {label, icon}) para títulos y placeholders
@@ -674,23 +698,28 @@ function navLeafHTML(it, sub){
 
 function renderNav(){
   const nav = document.getElementById('nav');
+  const visible = (it)=> !it.adminOnly || esAdmin();
   nav.innerHTML = MENU.map(node => {
-    if(!node.children) return navLeafHTML(node, false);
-    const hasActive = node.children.some(c=>c.id===currentView);
+    if(!node.children) return visible(node) ? navLeafHTML(node, false) : '';
+    const kids = node.children.filter(visible);
+    if(!kids.length) return '';
+    const hasActive = kids.some(c=>c.id===currentView);
     const open = navExpanded[node.key] || hasActive;
     return `<div class="nav-section">
       <button class="nav-item nav-parent ${open?'open':''} ${hasActive?'has-active':''}" data-toggle="${node.key}">
         ${ICN[node.icon]||''}<span>${node.label}</span>
         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-      <div class="nav-sub ${open?'open':''}">${node.children.map(c=>navLeafHTML(c,true)).join('')}</div>
+      <div class="nav-sub ${open?'open':''}">${kids.map(c=>navLeafHTML(c,true)).join('')}</div>
     </div>`;
   }).join('');
   nav.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { go(b.dataset.view); closeSidebar(); });
   nav.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k=b.dataset.toggle; navExpanded[k]=!(navExpanded[k]||MENU.find(m=>m.key===k).children.some(c=>c.id===currentView)); renderNav(); });
 }
 
+const ADMIN_VIEWS = new Set(['configuracion','perfiles']);
 function go(view){
+  if(ADMIN_VIEWS.has(view) && !esAdmin()){ toast('Solo el administrador puede acceder','error'); view='dashboard'; }
   currentView = view;
   const meta = META[view] || { label:view, icon:'box' };
   document.getElementById('pageTitle').textContent = meta.label;
@@ -715,13 +744,13 @@ VIEWS.dashboard = (el) => {
 
   el.innerHTML = `
     <div class="page-head">
-      <div><h1>Buenos días, Angelo 👋</h1><p>Resumen de tu negocio · ${new Date().toLocaleDateString('es-PE',{weekday:'long', day:'numeric', month:'long', year:'numeric'})}</p></div>
+      <div><h1>Hola, ${SESSION?SESSION.nombre:''} 👋</h1><p>Resumen de tu negocio · ${new Date().toLocaleDateString('es-PE',{weekday:'long', day:'numeric', month:'long', year:'numeric'})}</p></div>
       <button class="btn btn-primary" id="qVenta">${ICN.plus} Nueva venta</button>
     </div>
     <div class="kpi-grid">
       ${kpiCard('money','var(--green)','var(--green-soft)','Ventas registradas', money(ventasHoy), '+12.5%', true)}
       ${kpiCard('cart','var(--brand)','var(--brand-soft)','Nº de ventas', DB.ventas.length, DB.ventas.length+' documentos', null)}
-      ${kpiCard('box','var(--purple)','var(--purple-soft)','Valor de inventario', money(valorInv), totalStock+' unidades', null)}
+      ${esAdmin()?kpiCard('box','var(--purple)','var(--purple-soft)','Valor de inventario', money(valorInv), totalStock+' unidades', null):kpiCard('box','var(--purple)','var(--purple-soft)','Unidades en stock', totalStock.toLocaleString('es-PE'), DB.productos.length+' productos', null)}
       ${kpiCard('alert', bajoStock.length?'var(--red)':'var(--amber)', bajoStock.length?'var(--red-soft)':'var(--amber-soft)','Por cobrar', money(porCobrar), bajoStock.length+' productos bajo stock', bajoStock.length? false : null)}
     </div>
     <div class="grid-2" style="margin-bottom:20px">
@@ -959,7 +988,7 @@ function productModal(id) {
       <div class="field"><label>Origen</label><input id="f_origen" value="${p.origen||''}"/></div>
       <div class="field"><label>Unidad de medida</label>
         <select id="f_um">${['UND','JGO','CAJ','MTR','KG','LT'].map(u=>`<option ${p.um===u?'selected':''}>${u}</option>`).join('')}</select></div>
-      <div class="field"><label>Costo</label><input id="f_costo" type="number" step="0.01" value="${p.costo||''}"/></div>
+      <div class="field solo-admin"><label>Costo</label><input id="f_costo" type="number" step="0.01" value="${p.costo||''}"/></div>
       <div class="field"><label>Moneda</label>
         <select id="f_moneda"><option ${p.moneda==='S/'?'selected':''}>S/</option><option ${p.moneda==='$'?'selected':''}>$</option></select></div>
       <div class="field"><label>Precio venta <span class="req">*</span></label><input id="f_precio" type="number" step="0.01" value="${p.precio||''}"/></div>
@@ -1248,7 +1277,7 @@ function addStock(p,qty){
   p.pri=(Number(p.pri)||0)+qty;
   p.stock=(Number(p.pri)||0)+(Number(p.cie)||0)+(Number(p.vit)||0);
 }
-function recordMov(p,tipo,doc,cant){ DB.movimientos.push({ id:uid(), fecha:new Date().toISOString().slice(0,10), prodId:p.id, codigo:p.codigo, desc:p.desc, tipo, doc, cant }); }
+function recordMov(p,tipo,doc,cant){ DB.movimientos.push({ id:uid(), fecha:new Date().toISOString().slice(0,10), prodId:p.id, codigo:p.codigo, desc:p.desc, tipo, doc, cant, usuario:usuarioActual() }); }
 let emitLock=false;
 // Valida que haya stock suficiente. Devuelve [] si ok, o lista de faltantes.
 function validarStock(lines){
@@ -1274,7 +1303,7 @@ async function emitirVenta(){
     await commit(()=>{
       num = nextNumero(venta.tipo==='Boleta'?'BOLETA':'FACTURA');
       venta.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);deductStock(p,l.cant);recordMov(p,'VENTA',num,-l.cant);});
-      DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:venta.clienteId, cliente:cli?cli.nombre:'Cliente varios', items:venta.lines.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:venta.metodo==='Crédito'?'Pendiente':'Pagada', metodo:venta.metodo, tc:venta.tc, referencia:venta.fromCotiz||'', lineas });
+      DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:venta.clienteId, cliente:cli?cli.nombre:'Cliente varios', items:venta.lines.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:venta.metodo==='Crédito'?'Pendiente':'Pagada', metodo:venta.metodo, tc:venta.tc, referencia:venta.fromCotiz||'', usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
     });
   } catch(e){
     emitLock=false; if(btn) btn.disabled=false;
@@ -1294,22 +1323,23 @@ VIEWS.inventario=(el)=>{
   const bajo=DB.productos.filter(p=>prodEstado(p)!=='disponible');
   el.innerHTML=`
     <div class="page-head"><div><h1>Inventario</h1><p>Control de existencias y valorización</p></div>
-      <button class="btn btn-ghost" id="expInv">${ICN.download} Exportar</button></div>
+      <button class="btn btn-ghost solo-admin" id="expInv">${ICN.download} Exportar</button></div>
     <div class="kpi-grid">
-      ${kpiCard('box','var(--purple)','var(--purple-soft)','Valor total',money(valor),unidades+' unidades',null)}
+      <div class="solo-admin">${kpiCard('box','var(--purple)','var(--purple-soft)','Valor total',money(valor),unidades+' unidades',null)}</div>
       ${kpiCard('inventario','var(--brand)','var(--brand-soft)','SKUs activos',DB.productos.length,'productos',null)}
       ${kpiCard('alert','var(--red)','var(--red-soft)','Necesitan reposición',bajo.length,'productos',bajo.length?false:null)}
     </div>
     <div class="card"><div class="section-title">Existencias por producto</div><div class="table-wrap">
-      <table><thead><tr><th>Producto</th><th>Marca</th><th style="text-align:center">Stock</th><th style="text-align:center">Mín</th><th style="text-align:right">Costo unit.</th><th style="text-align:right">Valor stock</th><th style="text-align:center">Estado</th></tr></thead><tbody>
+      <table><thead><tr><th>Producto</th><th>Marca</th><th style="text-align:center">Stock</th><th style="text-align:center">Mín</th><th style="text-align:right" class="solo-admin">Costo unit.</th><th style="text-align:right" class="solo-admin">Valor stock</th><th style="text-align:center">Estado</th></tr></thead><tbody>
       ${DB.productos.map(p=>`<tr>
         <td><div class="cell-strong">${p.desc}</div><div class="cell-mono">${p.codigo}</div></td>
         <td>${p.marca||'—'}</td><td style="text-align:center">${stockBadge(p)}</td>
         <td style="text-align:center" class="cell-mono">${p.stockMin}</td>
-        <td style="text-align:right" class="cell-mono">${money(p.costo)}</td>
-        <td style="text-align:right" class="cell-strong">${money(p.costo*p.stock)}</td>
+        <td style="text-align:right" class="cell-mono solo-admin">${money(p.costo)}</td>
+        <td style="text-align:right" class="cell-strong solo-admin">${money(p.costo*p.stock)}</td>
         <td style="text-align:center">${estadoStockBadge(p)}</td></tr>`).join('')}
       </tbody></table></div></div>`;
+  const _exp=document.getElementById('expInv'); if(_exp)
   document.getElementById('expInv').onclick=()=>{ const rows=[['codigo','descripcion','stock','stockMin','costo','valor'].join(',')].concat(DB.productos.map(p=>[csvCell(p.codigo),csvCell(p.desc),p.stock,p.stockMin,p.costo,(p.costo*p.stock).toFixed(2)].join(','))); downloadCSV('inventario.csv',rows.join('\n')); toast('Inventario exportado','success'); };
 };
 function estadoStockBadge(p){const e=prodEstado(p);if(e==='agotado')return '<span class="badge badge-red">Agotado</span>';if(e==='bajo')return '<span class="badge badge-amber">Reponer</span>';return '<span class="badge badge-green">OK</span>';}
@@ -1840,6 +1870,50 @@ VIEWS.configuracion=(el)=>{
   };
 };
 
+/* ---------- PERFILES / USUARIOS (solo admin) ---------- */
+VIEWS.perfiles=(el)=>{
+  el.innerHTML=`
+    <div class="page-head"><div><h1>Perfiles / Usuarios</h1><p>Quién entra al sistema y qué puede ver</p></div>
+      <button class="btn btn-primary" id="addUser">${ICN.plus} Nuevo usuario</button></div>
+    <div class="card"><div class="table-wrap">
+      <table><thead><tr><th>Usuario</th><th>Acceso</th><th>Rol</th><th style="text-align:center">Estado</th><th></th></tr></thead><tbody>
+      ${DB.usuarios.map(u=>`<tr>
+        <td><div class="prod-cell"><div class="avatar" style="width:34px;height:34px;font-size:13px">${(u.nombre||'?').charAt(0)}</div><div class="cell-strong">${u.nombre}</div></div></td>
+        <td class="cell-mono">${u.usuario}</td>
+        <td>${u.rol==='admin'?'<span class="badge badge-blue">Administrador</span>':'<span class="badge badge-gray">Vendedor</span>'}</td>
+        <td style="text-align:center">${u.activo!==false?'<span class="badge badge-green">Activo</span>':'<span class="badge badge-red">Inactivo</span>'}</td>
+        <td><div class="row-actions"><button class="icon-btn" data-edit="${u.id}">${ICN.edit}</button><button class="icon-btn del" data-del="${u.id}">${ICN.del}</button></div></td>
+      </tr>`).join('')}
+      </tbody></table></div></div>
+    <p style="color:var(--ink-3);font-size:12.5px;margin-top:12px">El <b>Vendedor</b> no ve costos ni el módulo de configuración. Cada venta, compra y movimiento queda registrado con el usuario que lo hizo.</p>`;
+  document.getElementById('addUser').onclick=()=>userModal();
+  el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>userModal(b.dataset.edit));
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
+    const u=DB.usuarios.find(x=>x.id===b.dataset.del); if(!u) return;
+    if(SESSION && u.id===SESSION.id){ toast('No puedes eliminar tu propio usuario','error'); return; }
+    if(u.rol==='admin' && DB.usuarios.filter(x=>x.rol==='admin'&&x.activo!==false).length<=1){ toast('Debe quedar al menos un administrador','error'); return; }
+    confirmDialog('¿Eliminar usuario?','',()=>{ DB.usuarios=DB.usuarios.filter(x=>x.id!==b.dataset.del); save(); go('perfiles'); toast('Usuario eliminado','success'); });
+  });
+};
+function userModal(id){
+  const u=id?DB.usuarios.find(x=>x.id===id):{rol:'vendedor',activo:true};
+  openModal(id?'Editar usuario':'Nuevo usuario',`<div class="form-grid">
+    <div class="field"><label>Nombre <span class="req">*</span></label><input id="u_nombre" value="${u.nombre||''}"/></div>
+    <div class="field"><label>Usuario (para entrar) <span class="req">*</span></label><input id="u_usuario" value="${u.usuario||''}"/></div>
+    <div class="field"><label>PIN <span class="req">*</span></label><input id="u_pin" value="${u.pin||''}"/></div>
+    <div class="field"><label>Rol</label><select id="u_rol"><option value="vendedor" ${u.rol==='vendedor'?'selected':''}>Vendedor (no ve costos)</option><option value="admin" ${u.rol==='admin'?'selected':''}>Administrador</option></select></div>
+    <div class="field full"><label>Estado</label><select id="u_activo"><option value="1" ${u.activo!==false?'selected':''}>Activo</option><option value="0" ${u.activo===false?'selected':''}>Inactivo</option></select></div>
+  </div>`,()=>{
+    const nombre=val('u_nombre'), usuario=val('u_usuario'), pin=val('u_pin');
+    if(!nombre||!usuario||!pin){ toast('Nombre, usuario y PIN son obligatorios','error'); return false; }
+    if(DB.usuarios.some(x=>x.usuario===usuario && x.id!==id)){ toast('Ese nombre de usuario ya existe','error'); return false; }
+    const data={nombre,usuario,pin,rol:val('u_rol'),activo:val('u_activo')==='1'};
+    if(id){ Object.assign(DB.usuarios.find(x=>x.id===id),data); toast('Usuario actualizado','success'); }
+    else { DB.usuarios.unshift({id:uid(),...data}); toast('Usuario agregado','success'); }
+    save(); go('perfiles'); return true;
+  });
+}
+
 /* ---------- KARDEX ---------- */
 let kardexId=null;
 function tipoBadge(t){ return t==='COMPRA'?'<span class="badge badge-green">COMPRA</span>':t==='VENTA'?'<span class="badge badge-red">VENTA</span>':`<span class="badge badge-gray">${t}</span>`; }
@@ -2161,6 +2235,55 @@ document.addEventListener('keydown',(e)=>{
   if(e.key==='Escape'){ closeGlobal(); const m=document.getElementById('modal'); if(m) m.classList.remove('open'); }
 });
 
+/* ================== AUTENTICACIÓN Y ROLES (Fase 2B) ================== */
+let SESSION = null;
+function esAdmin(){ return !!(SESSION && SESSION.rol==='admin'); }
+function usuarioActual(){ return SESSION ? SESSION.usuario : ''; }
+function applyRole(){ document.body.classList.toggle('rol-vendedor', !esAdmin()); }
+function showLogin(){
+  const el=document.getElementById('loginScreen');
+  const users=(DB.usuarios||[]).filter(u=>u.activo!==false);
+  el.innerHTML=`<div class="login-card">
+    <div class="brand-logo" style="width:56px;height:56px;font-size:22px;margin:0 auto 14px">JL</div>
+    <h1 style="font-size:22px;font-weight:800;letter-spacing:-.5px">JL Repuestos</h1>
+    <p style="color:var(--ink-2);margin:4px 0 22px">Selecciona tu usuario para entrar</p>
+    <div class="login-users">${users.map(u=>`<button class="login-user" data-u="${u.id}"><div class="avatar">${(u.nombre||'?').charAt(0)}</div><div style="text-align:left"><div class="cell-strong">${u.nombre}</div><div style="font-size:12px;color:var(--ink-3)">${u.rol==='admin'?'Administrador':'Vendedor'}</div></div></button>`).join('')||'<p style="color:var(--ink-3)">No hay usuarios. Recarga la página.</p>'}</div>
+    <div id="pinArea"></div>
+  </div>`;
+  el.classList.add('open');
+  el.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>askPin(b.dataset.u));
+}
+function askPin(uid){
+  const u=(DB.usuarios||[]).find(x=>x.id===uid); if(!u) return;
+  const area=document.getElementById('pinArea');
+  area.innerHTML=`<div class="pin-box">
+    <div class="cell-strong" style="margin-bottom:10px">${u.nombre} — ingresa tu PIN</div>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="10" class="pin-input" placeholder="••••">
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:center"><button class="btn btn-ghost" id="pinBack">Volver</button><button class="btn btn-primary" id="pinOk">Entrar</button></div>
+    <div id="pinErr" style="color:var(--red);font-size:12.5px;margin-top:10px;height:16px"></div>
+  </div>`;
+  const inp=document.getElementById('pinInput'); setTimeout(()=>inp.focus(),30);
+  const intento=()=>{ if(String(u.pin)===String(inp.value)){ setSession(u); } else { document.getElementById('pinErr').textContent='PIN incorrecto'; inp.value=''; inp.focus(); } };
+  document.getElementById('pinOk').onclick=intento;
+  inp.onkeydown=(e)=>{ if(e.key==='Enter') intento(); };
+  document.getElementById('pinBack').onclick=()=>{ area.innerHTML=''; };
+}
+function setSession(u){
+  SESSION=u;
+  document.getElementById('loginScreen').classList.remove('open');
+  applyRole(); renderNav(); renderUserChip(); go('dashboard');
+  toast('Bienvenido, '+u.nombre,'success');
+}
+function logout(){ SESSION=null; showLogin(); }
+function renderUserChip(){
+  const el=document.getElementById('userChip'); if(!el) return;
+  if(!SESSION){ el.innerHTML=''; return; }
+  el.innerHTML=`<div class="avatar">${(SESSION.nombre||'?').charAt(0)}</div>
+    <div style="flex:1;min-width:0"><div class="user-name">${SESSION.nombre}</div><div class="user-role">${esAdmin()?'Administrador':'Vendedor'}</div></div>
+    <button class="icon-btn" id="logoutBtn" title="Cerrar sesión" style="color:#94a3b8;width:32px;height:32px">${ICN.logout}</button>`;
+  document.getElementById('logoutBtn').onclick=logout;
+}
+
 /* ---------- Boundary global de errores (ningún fallo queda en silencio) ---------- */
 window.addEventListener('error', (ev)=>{ console.error('[JLR] Error no controlado:', ev.error||ev.message); });
 window.addEventListener('unhandledrejection', (ev)=>{ console.error('[JLR] Promesa rechazada:', ev.reason); });
@@ -2183,7 +2306,7 @@ initTheme();
   applyConfig();
   setBrandLogo();
   renderNav();
-  go('dashboard');
+  showLogin();   // el sistema exige iniciar sesión; setSession() entra al dashboard
 })();
 </script>
 </body>
