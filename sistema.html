@@ -498,6 +498,7 @@ function seed() {
     caja: [],
     gastos: [],
     ordenescompra: [],
+    importaciones: [],
     series: [
       { tipo:'FACTURA', serie:'F001', ultimo:124 },
       { tipo:'BOLETA', serie:'B001', ultimo:512 },
@@ -540,7 +541,7 @@ async function load(){
   const s = seed(); try { await idbSet('db',s); } catch(e){} return s;
 }
 function normalize(d) {
-  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','guias','caja','gastos','ordenescompra','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
+  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','guias','caja','gastos','ordenescompra','importaciones','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
   const s = seed();
   if(!Array.isArray(d.tipocambio) || !d.tipocambio.length) d.tipocambio = s.tipocambio;
   d.cat = d.cat || {};
@@ -2447,6 +2448,115 @@ function recibirOC(id){
       });
     }catch(e){toast('No se pudo recibir la orden','error');return;}
     toast('Orden '+o.num+' recibida · stock ingresado','success'); renderOCLista(); renderNav();
+  });
+}
+
+/* ---------- IMPORTACIÓN (costo aterrizado / landed cost) ---------- */
+function convMoneda(monto, from, to, tc){ monto=Number(monto)||0; if(from===to) return monto; if(from==='$'&&to==='S/') return monto*(Number(tc)||tcActual()); if(from==='S/'&&to==='$') return monto/(Number(tc)||tcActual()); return monto; }
+// Prorratea los costos (flete+seguro+aduana+otros) entre las líneas según su valor FOB.
+// Devuelve cada línea con: importeFob, prorrateo, landedUnit (costo aterrizado unitario), landedTotal.
+function landedCost(lineas, costos){
+  const fobTotal = lineas.reduce((s,l)=>s+(Number(l.fob)||0)*(Number(l.cant)||0),0);
+  const extra = (Number(costos.flete)||0)+(Number(costos.seguro)||0)+(Number(costos.aduana)||0)+(Number(costos.otros)||0);
+  return lineas.map(l=>{
+    const cant=Number(l.cant)||0, importeFob=(Number(l.fob)||0)*cant;
+    const prorrateo = fobTotal>0 ? extra*(importeFob/fobTotal) : (lineas.length?extra/lineas.length:0);
+    const landedTotal = importeFob+prorrateo;
+    const landedUnit = cant>0 ? landedTotal/cant : (Number(l.fob)||0);
+    return Object.assign({}, l, { importeFob, prorrateo, landedTotal, landedUnit });
+  });
+}
+let imp=null;
+VIEWS.importacion=(el)=>{
+  el.innerHTML=`<div class="page-head"><div><h1>Importación</h1><p>Costo aterrizado: reparte flete, seguro y aduana entre tus productos</p></div>
+    <div class="segmented" id="segImp"><button data-t="lista" class="active">Historial</button><button data-t="nueva">Nueva importación</button></div></div>
+    <div id="impBody"></div>`;
+  el.querySelectorAll('#segImp button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#segImp button').forEach(x=>x.classList.remove('active'));b.classList.add('active');b.dataset.t==='nueva'?renderNuevaImp():renderImpLista();});
+  renderImpLista();
+};
+function renderImpLista(){
+  const b=document.getElementById('impBody');
+  b.innerHTML=`<div class="card"><div class="section-title">Importaciones</div><div class="table-wrap">
+    <table><thead><tr><th>Número</th><th>Proveedor</th><th>Fecha</th><th style="text-align:center">Ítems</th><th>Estado</th><th style="text-align:right">Costo total</th><th></th></tr></thead><tbody>
+    ${DB.importaciones.map(o=>`<tr><td class="cell-mono cell-strong">${o.num}</td><td class="cell-strong">${o.proveedor}</td><td>${fmtDate(o.fecha)}</td><td style="text-align:center">${o.items}</td><td>${o.estado==='Recibida'?'<span class="badge badge-green">Recibida</span>':'<span class="badge badge-amber">En tránsito</span>'}</td><td style="text-align:right" class="cell-strong">${money2(o.totalLanded,o.moneda)}</td>
+      <td><div class="row-actions">${o.estado!=='Recibida'?`<button class="btn btn-primary btn-sm" data-recibir="${o.id}">${ICN.check} Recibir</button>`:''}<button class="icon-btn del" data-del="${o.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(7)}
+    </tbody></table></div></div>`;
+  b.querySelectorAll('[data-recibir]').forEach(x=>x.onclick=()=>recibirImp(x.dataset.recibir));
+  b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>confirmDialog('¿Eliminar importación?','',()=>{DB.importaciones=DB.importaciones.filter(o=>o.id!==x.dataset.del);save();renderImpLista();toast('Importación eliminada','success');}));
+}
+function renderNuevaImp(){ imp={proveedor:DB.proveedores[0]?.nombre||'', moneda:'$', tc:tcActual(), lines:[], costos:{flete:0,seguro:0,aduana:0,otros:0}}; drawImp(); }
+function drawImp(){
+  const b=document.getElementById('impBody');
+  const calc=landedCost(imp.lines.map(l=>({fob:l.fob,cant:l.cant})), imp.costos);
+  const fobTotal=calc.reduce((s,l)=>s+l.importeFob,0);
+  const extra=(Number(imp.costos.flete)||0)+(Number(imp.costos.seguro)||0)+(Number(imp.costos.aduana)||0)+(Number(imp.costos.otros)||0);
+  const totalLanded=fobTotal+extra;
+  const sym=imp.moneda;
+  b.innerHTML=`<div class="venta-layout">
+    <div class="card"><div class="section-title">Productos importados (FOB)</div>
+      <div style="padding:16px"><div class="line-add"><select class="filter-select" id="selProdImp" style="flex:1"><option value="">+ Agregar producto...</option>${DB.productos.slice(0,800).map(p=>`<option value="${p.id}">${p.codigo} · ${p.desc}</option>`).join('')}</select></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">FOB unit.</th><th style="text-align:right">Aterrizado unit.</th><th></th></tr></thead><tbody>
+      ${imp.lines.length?imp.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId);const cc=calc[i];return `<tr><td><div class="cell-strong">${p.desc}</div><div class="cell-mono">${p.codigo}</div></td>
+        <td style="text-align:center"><input class="qty-input" type="number" min="1" value="${l.cant}" data-impq="${i}"/></td>
+        <td style="text-align:right"><input class="qty-input" style="width:90px;text-align:right" type="number" step="0.01" value="${l.fob}" data-impf="${i}"/></td>
+        <td style="text-align:right" class="cell-strong" style="color:var(--brand)">${money2(cc.landedUnit,sym)}</td>
+        <td><div class="row-actions"><button class="icon-btn del" data-imprm="${i}">${ICN.del}</button></div></td></tr>`;}).join(''):`<tr><td colspan="5" class="empty" style="padding:40px">${ICN.box}<h3>Sin productos</h3><p>Agrega los productos que importas con su costo FOB.</p></td></tr>`}
+      </tbody></table></div></div>
+    <div class="card cart-summary">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="field"><label>Moneda</label><select id="impMon"><option value="$" ${imp.moneda==='$'?'selected':''}>Dólares</option><option value="S/" ${imp.moneda==='S/'?'selected':''}>Soles</option></select></div>
+        <div class="field"><label>T.C.</label><input id="impTC" type="number" step="0.001" value="${imp.tc}"/></div>
+      </div>
+      <div class="field" style="margin-bottom:12px"><label>Proveedor</label><select id="impProv">${DB.proveedores.map(p=>`<option ${imp.proveedor===p.nombre?'selected':''}>${p.nombre}</option>`).join('')}</select></div>
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-2);margin:6px 0 10px">Costos de importación (${sym})</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div class="field"><label>Flete</label><input id="imp_flete" type="number" step="0.01" value="${imp.costos.flete||''}"/></div>
+        <div class="field"><label>Seguro</label><input id="imp_seguro" type="number" step="0.01" value="${imp.costos.seguro||''}"/></div>
+        <div class="field"><label>Aduana</label><input id="imp_aduana" type="number" step="0.01" value="${imp.costos.aduana||''}"/></div>
+        <div class="field"><label>Otros</label><input id="imp_otros" type="number" step="0.01" value="${imp.costos.otros||''}"/></div>
+      </div>
+      <div class="summ-row"><span>FOB total</span><span>${money2(fobTotal,sym)}</span></div>
+      <div class="summ-row"><span>+ Costos</span><span>${money2(extra,sym)}</span></div>
+      <div class="summ-row total"><span>Costo aterrizado</span><span>${money2(totalLanded,sym)}</span></div>
+      <button class="btn btn-primary" id="emitImp" style="width:100%;justify-content:center;margin-top:18px" ${imp.lines.length?'':'disabled'}>${ICN.check} Grabar importación</button>
+    </div></div>`;
+  document.getElementById('selProdImp').onchange=(e)=>{if(e.target.value){const p=DB.productos.find(x=>x.id===e.target.value);const ex=imp.lines.find(l=>l.prodId===e.target.value);if(ex)ex.cant++;else imp.lines.push({prodId:e.target.value,cant:1,fob:Number(p.costo)||0});drawImp();}};
+  document.getElementById('impMon').onchange=(e)=>{imp.moneda=e.target.value;drawImp();};
+  document.getElementById('impTC').onchange=(e)=>{imp.tc=parseFloat(e.target.value)||1;drawImp();};
+  document.getElementById('impProv').onchange=(e)=>imp.proveedor=e.target.value;
+  ['flete','seguro','aduana','otros'].forEach(k=>{ document.getElementById('imp_'+k).onchange=(e)=>{imp.costos[k]=parseFloat(e.target.value)||0;drawImp();}; });
+  b.querySelectorAll('[data-impq]').forEach(inp=>inp.onchange=()=>{let v=parseInt(inp.value)||1;if(v<1)v=1;imp.lines[inp.dataset.impq].cant=v;drawImp();});
+  b.querySelectorAll('[data-impf]').forEach(inp=>inp.onchange=()=>{imp.lines[inp.dataset.impf].fob=parseFloat(inp.value)||0;drawImp();});
+  b.querySelectorAll('[data-imprm]').forEach(x=>x.onclick=()=>{imp.lines.splice(x.dataset.imprm,1);drawImp();});
+  const emit=document.getElementById('emitImp'); if(emit&&imp.lines.length)emit.onclick=grabarImp;
+}
+async function grabarImp(){
+  if(emitLock) return; emitLock=true; const btn=document.getElementById('emitImp'); if(btn)btn.disabled=true;
+  const calc=landedCost(imp.lines.map(l=>({fob:l.fob,cant:l.cant})), imp.costos);
+  const totalLanded=calc.reduce((s,l)=>s+l.landedTotal,0);
+  const num='IMP-'+String(1000+DB.importaciones.length+1);
+  const lineas=imp.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId);return {prodId:l.prodId,codigo:p.codigo,desc:p.desc,cant:l.cant,fob:l.fob,landedUnit:calc[i].landedUnit};});
+  DB.importaciones.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:imp.proveedor,moneda:imp.moneda,tc:imp.tc,costos:Object.assign({},imp.costos),items:imp.lines.reduce((s,l)=>s+l.cant,0),totalLanded,estado:'En tránsito',usuario:usuarioActual(),creado:new Date().toISOString(),lineas});
+  try{await persist();}catch(e){emitLock=false;if(btn)btn.disabled=false;toast('No se pudo guardar','error');return;}
+  toast('Importación '+num+' grabada','success'); emitLock=false;
+  document.querySelector('#segImp button[data-t="lista"]').click();
+}
+function recibirImp(id){
+  const o=DB.importaciones.find(x=>x.id===id); if(!o||o.estado==='Recibida') return;
+  confirmDialog('¿Recibir la importación '+o.num+'?','Ingresará el stock con el COSTO ATERRIZADO (promedio ponderado) y la marcará como Recibida.',async ()=>{
+    try{
+      await commit(()=>{
+        (o.lineas||[]).forEach(l=>{ if(l.prodId){ const p=DB.productos.find(x=>x.id===l.prodId); if(p){
+          const stockPrev=Number(p.stock)||0, costoPrev=Number(p.costo)||0;
+          const landedEnProducto=convMoneda(l.landedUnit, o.moneda, p.moneda, o.tc);
+          addStock(p,l.cant);
+          p.costo=(costoPrev>0&&stockPrev>0)?(stockPrev*costoPrev+l.cant*landedEnProducto)/(stockPrev+l.cant):landedEnProducto;
+          recordMov(p,'COMPRA',o.num,l.cant);
+        } } });
+        const oo=DB.importaciones.find(x=>x.id===id); if(oo) oo.estado='Recibida';
+      });
+    }catch(e){toast('No se pudo recibir','error');return;}
+    toast('Importación '+o.num+' recibida · costo aterrizado aplicado','success'); renderImpLista(); renderNav();
   });
 }
 
