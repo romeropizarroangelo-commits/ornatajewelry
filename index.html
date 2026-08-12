@@ -921,7 +921,7 @@ function renderGrid(){
     <div class="prod-card reveal ${'d'+((i%3)+1)} in${p.agotado?' is-out':''}">
       <div class="prod-media">
         ${badge}
-        <img src="${imgSrc(p)}" alt="${p.nombre}" loading="lazy" onerror="this.style.display='none';this.insertAdjacentHTML('afterend', ORNATA_FB(this))" data-fb='${encodeURIComponent(fallback(p))}'>
+        ${imgSrc(p)?`<img src="${imgSrc(p)}" alt="${p.nombre}" loading="lazy" onerror="this.style.display='none';this.insertAdjacentHTML('afterend', ORNATA_FB(this))" data-fb='${encodeURIComponent(fallback(p))}'>`:fallback(p)}
       </div>
       <div class="prod-body">
         <p class="cat">${p.categoria}</p>
