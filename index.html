@@ -210,7 +210,7 @@ h2.display{font-size:clamp(2.4rem,5.5vw,4.2rem);color:var(--plum-900);margin-bot
 .prod-card{background:#fff;border-radius:10px;overflow:hidden;transition:transform .6s var(--ease),box-shadow .6s var(--ease);
   box-shadow:0 20px 50px -40px rgba(90,60,90,.5)}
 .prod-card:hover{transform:translateY(-8px);box-shadow:0 40px 70px -40px rgba(90,60,90,.55)}
-.prod-media{position:relative;aspect-ratio:1;background:linear-gradient(150deg,#efe6f3,#e4d6ec);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.prod-media{position:relative;aspect-ratio:1;background:#f5f2f8;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .prod-media svg{width:46%;color:var(--lilac);transition:transform .8s var(--ease)}
 .prod-card:hover .prod-media svg{transform:scale(1.1) rotate(-3deg)}
 .prod-media .tag{position:absolute;top:14px;left:14px;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;
@@ -317,8 +317,8 @@ footer{background:var(--plum-950);color:var(--lilac-soft);padding:5rem 0 2.4rem}
 .prod-empty{text-align:center;color:var(--text-soft);margin-top:2rem}
 
 /* product cards get real images */
-.prod-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .8s var(--ease)}
-.prod-card:hover .prod-media img{transform:scale(1.06)}
+.prod-media img{max-width:82%;max-height:82%;width:auto;height:auto;object-fit:contain;display:block;transition:transform .7s var(--ease)}
+.prod-card:hover .prod-media img{transform:scale(1.05)}
 .prod-media .ph-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6rem;color:var(--lilac);
   background:linear-gradient(150deg,#efe6f3,#e4d6ec)}
 .prod-media .ph-fallback svg{width:40%;position:static}
