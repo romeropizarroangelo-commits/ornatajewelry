@@ -3080,11 +3080,13 @@ function showLogin(){
     <div class="brand-logo" style="width:56px;height:56px;font-size:22px;margin:0 auto 14px">JL</div>
     <h1 style="font-size:22px;font-weight:800;letter-spacing:-.5px">JL Repuestos</h1>
     <p style="color:var(--ink-2);margin:4px 0 22px">Selecciona tu usuario para entrar</p>
-    <div class="login-users">${users.map(u=>`<button class="login-user" data-u="${u.id}"><div class="avatar">${(u.nombre||'?').charAt(0)}</div><div style="text-align:left"><div class="cell-strong">${u.nombre}</div><div style="font-size:12px;color:var(--ink-3)">${u.rol==='admin'?'Administrador':'Vendedor'}</div></div></button>`).join('')||'<p style="color:var(--ink-3)">No hay usuarios. Recarga la página.</p>'}</div>
+    <div class="login-users">${users.map(u=>`<button class="login-user" data-u="${u.id}"><div class="avatar">${(u.nombre||'?').charAt(0)}</div><div style="text-align:left"><div class="cell-strong">${u.nombre}</div><div style="font-size:12px;color:var(--ink-3)">${u.rol==='admin'?'Administrador':'Vendedor'}</div></div></button>`).join('')||'<p style="color:var(--ink-3);margin-bottom:12px">No hay usuarios registrados.</p><button class="btn btn-primary" id="crearAdmin">Crear usuario administrador</button>'}</div>
     <div id="pinArea"></div>
   </div>`;
   el.classList.add('open');
   el.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>askPin(b.dataset.u));
+  const ca=document.getElementById('crearAdmin');
+  if(ca) ca.onclick=()=>{ DB.usuarios=[ {id:'u-admin',nombre:'Angelo',usuario:'admin',pin:'1234',rol:'admin',activo:true}, {id:'u-vend',nombre:'Vendedor',usuario:'vendedor',pin:'0000',rol:'vendedor',activo:true} ]; save().finally(()=>showLogin()); };
 }
 function askPin(uid){
   const u=(DB.usuarios||[]).find(x=>x.id===uid); if(!u) return;
@@ -3135,6 +3137,15 @@ initTheme();
         <button class="btn btn-primary" onclick="location.reload()">Reintentar</button>
       </div>`;
     return;
+  }
+  // Garantía: si por cualquier razón la BD quedó sin usuarios, recrea los de por defecto
+  // (evita quedar bloqueado en el login "No hay usuarios"). NO toca el resto de datos.
+  if(!Array.isArray(DB.usuarios) || !DB.usuarios.length){
+    DB.usuarios = [
+      { id:'u-admin', nombre:'Angelo', usuario:'admin', pin:'1234', rol:'admin', activo:true },
+      { id:'u-vend', nombre:'Vendedor', usuario:'vendedor', pin:'0000', rol:'vendedor', activo:true },
+    ];
+    try { await save(); } catch(e){}
   }
   applyConfig();
   setBrandLogo();
