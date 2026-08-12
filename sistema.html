@@ -503,6 +503,8 @@ function seed() {
     letras: [],
     retenciones: [],
     percepciones: [],
+    cierres: [],
+    empresas: [],
     series: [
       { tipo:'FACTURA', serie:'F001', ultimo:124 },
       { tipo:'BOLETA', serie:'B001', ultimo:512 },
@@ -549,7 +551,7 @@ async function load(){
   const s = seed(); try { await idbSet('db',s); } catch(e){} return s;
 }
 function normalize(d) {
-  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','notasdebito','guias','caja','gastos','ordenescompra','importaciones','letras','retenciones','percepciones','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
+  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','notasdebito','guias','caja','gastos','ordenescompra','importaciones','letras','retenciones','percepciones','cierres','empresas','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
   const s = seed();
   if(!Array.isArray(d.tipocambio) || !d.tipocambio.length) d.tipocambio = s.tipocambio;
   d.cat = d.cat || {};
@@ -662,7 +664,9 @@ const MENU = [
     { id:'modelos', label:'Modelos' },
     { id:'familias', label:'Familias' },
     { id:'servicios', label:'Servicios' },
+    { id:'listaprecios', label:'Lista de Precios' },
     { id:'tipocambio', label:'Tipo de Cambio' },
+    { id:'empresas', label:'Empresas', adminOnly:true },
     { id:'perfiles', label:'Perfiles / Usuarios', adminOnly:true },
   ]},
   { key:'inventario', label:'Inventario', icon:'inventario', children:[
@@ -670,6 +674,8 @@ const MENU = [
     { id:'kardex', label:'Kardex' },
     { id:'ajuste', label:'Ajuste de Inventario' },
     { id:'guiaremision', label:'Guía de Remisión' },
+    { id:'cierremensual', label:'Cierre Mensual', adminOnly:true },
+    { id:'unioncodigo', label:'Unión de Código', adminOnly:true },
   ]},
   { key:'compras', label:'Compras', icon:'compras', children:[
     { id:'ordencompra', label:'Orden de Compra' },
@@ -738,7 +744,7 @@ function renderNav(){
   nav.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k=b.dataset.toggle; navExpanded[k]=!(navExpanded[k]||MENU.find(m=>m.key===k).children.some(c=>c.id===currentView)); renderNav(); });
 }
 
-const ADMIN_VIEWS = new Set(['configuracion','perfiles','repmargen']);
+const ADMIN_VIEWS = new Set(['configuracion','perfiles','repmargen','cierremensual','unioncodigo','empresas']);
 function go(view){
   if(ADMIN_VIEWS.has(view) && !esAdmin()){ toast('Solo el administrador puede acceder','error'); view='dashboard'; }
   currentView = view;
@@ -2800,6 +2806,140 @@ function letraModal(){
     cuotas.forEach((c,i)=>{ DB.letras.unshift({ id:uid(), num: n>1?(base+'-'+(i+1)+'/'+n):base, tipo:letrasTipo, entidadId:val('lt_ent'), entidad:ent?ent.nombre:'—', docRef:doc, monto:c.monto, fechaEmision:hoy, fechaVencimiento:c.fechaVencimiento, estado:'Pendiente', banco, usuario:usuarioActual() }); });
     persist().then(()=>{renderLetras();toast(n+' letra(s) generada(s)','success');}).catch(()=>toast('No se pudo guardar','error'));
     return true;
+  });
+}
+
+/* ---------- LISTA DE PRECIOS ---------- */
+let lpQ='';
+VIEWS.listaprecios=(el)=>{
+  lpQ='';
+  el.innerHTML=`<div class="page-head"><div><h1>Lista de Precios</h1><p>Precios por nivel de todo tu catálogo</p></div>
+    <div style="display:flex;gap:10px"><button class="btn btn-ghost" id="lpExp">${ICN.download} Exportar</button><button class="btn btn-primary" id="lpPrint">${ICN.print} Imprimir</button></div></div>
+    <div class="card"><div style="padding:16px;border-bottom:1px solid var(--line)"><div class="search" style="width:340px;max-width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="lpq" placeholder="Filtrar por código, marca, descripción..."/></div></div>
+      <div class="table-wrap" id="lpTable"></div></div>`;
+  const q=document.getElementById('lpq'); q.oninput=()=>{lpQ=q.value;renderLP();};
+  document.getElementById('lpExp').onclick=()=>{ const list=lpList(); const rows=[['codigo','descripcion','marca','mostrador','por_mayor','taller','flota','moneda'].join(',')].concat(list.map(p=>[csvCell(p.codigo),csvCell(p.desc),csvCell(p.marca),p.precio||0,p.precioMayor||0,p.precioTaller||0,p.precioFlota||0,p.moneda||'S/'].join(','))); downloadCSV('lista_precios.csv',rows.join('\n')); toast('Lista exportada','success'); };
+  document.getElementById('lpPrint').onclick=()=>printListaPrecios(lpList());
+  renderLP();
+};
+function lpList(){ return lpQ.trim()? buscarProductos(lpQ,0) : DB.productos; }
+function renderLP(){
+  const list=lpList(); const wrap=document.getElementById('lpTable'); const show=list.slice(0,200);
+  wrap.innerHTML=`<table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th style="text-align:right">Mostrador</th><th style="text-align:right">Por Mayor</th><th style="text-align:right">Taller</th><th style="text-align:right">Flota</th></tr></thead><tbody>
+    ${show.map(p=>`<tr><td class="cell-mono cell-strong">${p.codigo}</td><td class="cell-strong">${p.desc}</td><td>${p.marca||'—'}</td>
+      <td style="text-align:right" class="cell-strong">${money2(p.precio,p.moneda)}</td>
+      <td style="text-align:right">${Number(p.precioMayor)>0?money2(p.precioMayor,p.moneda):'—'}</td>
+      <td style="text-align:right">${Number(p.precioTaller)>0?money2(p.precioTaller,p.moneda):'—'}</td>
+      <td style="text-align:right">${Number(p.precioFlota)>0?money2(p.precioFlota,p.moneda):'—'}</td></tr>`).join('')||emptyRow(7)}
+    </tbody></table>${list.length>200?`<div style="padding:12px 16px;color:var(--ink-3);font-size:12px">Mostrando 200 de ${list.length.toLocaleString('es-PE')}. Usa Exportar/Imprimir para el detalle completo.</div>`:''}`;
+}
+function printListaPrecios(list){
+  const w=window.open('','_blank','width=900,height=1000'); if(!w){toast('Permite las ventanas emergentes','error');return;}
+  const rows=list.slice(0,2000).map(p=>`<tr><td>${p.codigo||''}</td><td>${p.desc||''}</td><td>${p.marca||''}</td><td class="r">${money2(p.precio,p.moneda)}</td><td class="r">${Number(p.precioMayor)>0?money2(p.precioMayor,p.moneda):'—'}</td></tr>`).join('');
+  w.document.write(`<html><head><title>Lista de Precios</title><meta charset="utf-8"><style>body{font-family:Arial;font-size:11px;padding:24px;color:#111}h1{color:#e01f26;font-size:18px}table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#111;color:#fff;padding:6px;text-align:left;font-size:10px}td{padding:5px 6px;border-bottom:1px solid #eee}td.r{text-align:right}@media print{body{padding:0}}</style></head><body>
+    <h1>${COMPANY.nombre}</h1><div>Lista de Precios · ${fmtDate(new Date().toISOString().slice(0,10))}</div>
+    <table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th class="r">Mostrador</th><th class="r">Por Mayor</th></tr></thead><tbody>${rows}</tbody></table>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
+
+/* ---------- CIERRE MENSUAL ---------- */
+VIEWS.cierremensual=(el)=>{
+  const unidades=DB.productos.reduce((s,p)=>s+Number(p.stock||0),0);
+  const valor=DB.productos.reduce((s,p)=>s+Number(p.costo||0)*Number(p.stock||0),0);
+  const skus=DB.productos.filter(p=>Number(p.stock)>0).length;
+  const mes=new Date().toISOString().slice(0,7);
+  const yaCerrado=DB.cierres.some(c=>c.mes===mes);
+  el.innerHTML=`<div class="page-head"><div><h1>Cierre Mensual</h1><p>Foto del inventario al cierre de cada mes</p></div>
+    <button class="btn btn-primary" id="cerrarMes" ${yaCerrado?'disabled':''}>${ICN.check} Cerrar mes ${mes}</button></div>
+    <div class="kpi-grid">
+      ${kpiCard('box','var(--purple)','var(--purple-soft)','Valor inventario (costo)',money(valor),unidades+' unidades',null)}
+      ${kpiCard('inventario','var(--brand)','var(--brand-soft)','SKUs con stock',skus,'productos',null)}
+    </div>
+    <div class="card"><div class="section-title">Cierres registrados</div><div class="table-wrap">
+    <table><thead><tr><th>Mes</th><th>Fecha cierre</th><th style="text-align:center">SKUs</th><th style="text-align:right">Unidades</th><th style="text-align:right">Valor (costo)</th><th>Usuario</th></tr></thead><tbody>
+    ${[...DB.cierres].reverse().map(c=>`<tr><td class="cell-strong">${c.mes}</td><td>${fmtDate(c.fecha)}</td><td style="text-align:center">${c.skus}</td><td style="text-align:right" class="cell-mono">${(Number(c.unidades)||0).toLocaleString('es-PE')}</td><td style="text-align:right" class="cell-strong">${money(c.valor)}</td><td class="cell-mono">${c.usuario||''}</td></tr>`).join('')||emptyRow(6)}
+    </tbody></table></div></div>`;
+  const btn=document.getElementById('cerrarMes');
+  if(btn && !yaCerrado) btn.onclick=()=>confirmDialog('¿Cerrar el mes '+mes+'?','Se guardará una foto del inventario actual (valor y unidades) como referencia histórica.',async ()=>{
+    try{ await commit(()=>{ DB.cierres.push({id:uid(),mes,fecha:new Date().toISOString().slice(0,10),unidades,valor,skus,usuario:usuarioActual()}); }); }
+    catch(e){ toast('No se pudo cerrar','error'); return; }
+    toast('Mes '+mes+' cerrado','success'); go('cierremensual');
+  });
+};
+
+/* ---------- UNIÓN DE CÓDIGO (fusionar duplicados) ---------- */
+let unionSel={origen:null,destino:null};
+function unirCodigos(origen, destino){
+  // Suma el stock del origen al destino (por almacén), reasigna movimientos y elimina el origen.
+  ['pri','cie','vit','mer'].forEach(k=>{ if(origen[k]!==undefined||destino[k]!==undefined) destino[k]=(Number(destino[k])||0)+(Number(origen[k])||0); });
+  destino.stock=(Number(destino.pri)||0)+(Number(destino.cie)||0)+(Number(destino.vit)||0);
+  if(destino.pri===undefined && destino.cie===undefined) destino.stock=(Number(destino.stock)||0)+(Number(origen.stock)||0);
+  DB.movimientos.forEach(m=>{ if(m.prodId===origen.id){ m.prodId=destino.id; m.codigo=destino.codigo; } });
+  DB.productos=DB.productos.filter(p=>p.id!==origen.id);
+  invalidarBlob();
+}
+VIEWS.unioncodigo=(el)=>{
+  unionSel={origen:null,destino:null};
+  el.innerHTML=`<div class="page-head"><div><h1>Unión de Código</h1><p>Fusiona dos productos duplicados en uno solo</p></div></div>
+    <div class="grid-2">
+      ${unionPickerCard('origen','Producto a eliminar (origen)')}
+      ${unionPickerCard('destino','Producto que se queda (destino)')}
+    </div>
+    <div class="card" style="margin-top:20px"><div style="padding:20px" id="unionAccion"><p style="color:var(--ink-3)">Elige el producto <b>origen</b> (se eliminará) y el <b>destino</b> (se queda y recibe el stock).</p></div></div>`;
+  ['origen','destino'].forEach(rol=>{
+    const si=document.getElementById('u_'+rol); const box=document.getElementById('ur_'+rol);
+    si.oninput=()=>{ const res=buscarProductos(si.value,8); box.innerHTML=res.map(p=>`<div class="gr-item" data-p="${p.id}"><div><div class="cell-strong">${p.desc}</div><div class="cell-mono" style="color:var(--ink-3);font-size:11.5px">${p.codigo} · stock ${p.stock}</div></div></div>`).join('')||'<div style="padding:12px;color:var(--ink-3)">Sin resultados</div>'; box.classList.add('open');
+      box.querySelectorAll('[data-p]').forEach(r=>r.onclick=()=>{ unionSel[rol]=DB.productos.find(x=>x.id===r.dataset.p); box.classList.remove('open'); si.value=unionSel[rol].codigo+' · '+unionSel[rol].desc; renderUnionAccion(); }); };
+  });
+};
+function unionPickerCard(rol,label){
+  return `<div class="card"><div class="section-title">${label}</div><div style="padding:16px;position:relative">
+    <div class="search" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="u_${rol}" placeholder="Buscar producto..." autocomplete="off"></div>
+    <div id="ur_${rol}" class="global-results" style="left:16px;right:16px"></div></div></div>`;
+}
+function renderUnionAccion(){
+  const a=document.getElementById('unionAccion'); const o=unionSel.origen, d=unionSel.destino;
+  if(!o||!d){ a.innerHTML='<p style="color:var(--ink-3)">Elige ambos productos.</p>'; return; }
+  if(o.id===d.id){ a.innerHTML='<p style="color:var(--red)">Origen y destino no pueden ser el mismo producto.</p>'; return; }
+  a.innerHTML=`<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+      <div style="flex:1;min-width:200px"><div style="font-size:11px;color:var(--red);font-weight:700">SE ELIMINA</div><div class="cell-strong">${o.desc}</div><div class="cell-mono">${o.codigo} · stock ${o.stock}</div></div>
+      <div style="font-size:22px;color:var(--brand)">→</div>
+      <div style="flex:1;min-width:200px"><div style="font-size:11px;color:var(--green);font-weight:700">SE QUEDA</div><div class="cell-strong">${d.desc}</div><div class="cell-mono">${d.codigo} · stock ${d.stock} → ${Number(d.stock)+Number(o.stock)}</div></div>
+    </div>
+    <button class="btn btn-danger" id="doUnion">${ICN.check} Fusionar productos</button>`;
+  document.getElementById('doUnion').onclick=()=>confirmDialog('¿Fusionar?','El producto "'+o.desc+'" se ELIMINARÁ y su stock ('+o.stock+') pasará a "'+d.desc+'". No se puede deshacer.',async ()=>{
+    try{ await commit(()=>{ const oo=DB.productos.find(p=>p.id===o.id), dd=DB.productos.find(p=>p.id===d.id); if(oo&&dd) unirCodigos(oo,dd); }); }
+    catch(e){ toast('No se pudo fusionar','error'); return; }
+    toast('Productos fusionados','success'); go('unioncodigo');
+  });
+}
+
+/* ---------- EMPRESAS (sucursales / razones sociales) ---------- */
+VIEWS.empresas=(el)=>{
+  el.innerHTML=`<div class="page-head"><div><h1>Empresas</h1><p>Razones sociales / sucursales (la principal se edita en Configuración)</p></div>
+    <button class="btn btn-primary" id="addEmp">${ICN.plus} Nueva empresa</button></div>
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Razón social</th><th>RUC</th><th>Dirección</th><th></th></tr></thead><tbody>
+    ${DB.empresas.map(e=>`<tr><td class="cell-strong">${e.nombre}</td><td class="cell-mono">${e.ruc||'—'}</td><td>${e.direccion||'—'}</td><td><div class="row-actions"><button class="icon-btn" data-edit="${e.id}">${ICN.edit}</button><button class="icon-btn del" data-del="${e.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(4)}
+    </tbody></table></div></div>`;
+  document.getElementById('addEmp').onclick=()=>empresaModal();
+  el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>empresaModal(b.dataset.edit));
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDialog('¿Eliminar empresa?','',()=>{DB.empresas=DB.empresas.filter(x=>x.id!==b.dataset.del);save();go('empresas');toast('Empresa eliminada','success');}));
+};
+function empresaModal(id){
+  const e=id?DB.empresas.find(x=>x.id===id):{};
+  openModal(id?'Editar empresa':'Nueva empresa',`<div class="form-grid">
+    <div class="field full"><label>Razón social <span class="req">*</span></label><input id="e_nombre" value="${e.nombre||''}"/></div>
+    <div class="field"><label>RUC</label><input id="e_ruc" value="${e.ruc||''}"/></div>
+    <div class="field"><label>Teléfono</label><input id="e_tel" value="${e.tel||''}"/></div>
+    <div class="field full"><label>Dirección</label><input id="e_dir" value="${e.direccion||''}"/></div>
+  </div>`,()=>{
+    const nombre=val('e_nombre'); if(!nombre){toast('La razón social es obligatoria','error');return false;}
+    const data={nombre,ruc:val('e_ruc'),tel:val('e_tel'),direccion:val('e_dir')};
+    if(id){Object.assign(DB.empresas.find(x=>x.id===id),data);toast('Empresa actualizada','success');}
+    else{DB.empresas.unshift({id:uid(),...data});toast('Empresa agregada','success');}
+    save();go('empresas');return true;
   });
 }
 
