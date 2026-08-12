@@ -501,6 +501,8 @@ function seed() {
     importaciones: [],
     notasdebito: [],
     letras: [],
+    retenciones: [],
+    percepciones: [],
     series: [
       { tipo:'FACTURA', serie:'F001', ultimo:124 },
       { tipo:'BOLETA', serie:'B001', ultimo:512 },
@@ -508,6 +510,8 @@ function seed() {
       { tipo:'NOTA_CREDITO', serie:'FC01', ultimo:0 },
       { tipo:'NOTA_DEBITO', serie:'FD01', ultimo:0 },
       { tipo:'GUIA', serie:'T001', ultimo:0 },
+      { tipo:'RETENCION', serie:'R001', ultimo:0 },
+      { tipo:'PERCEPCION', serie:'P001', ultimo:0 },
       { tipo:'COMPRA', serie:'F-', ultimo:2205 },
     ],
     usuarios: [
@@ -545,7 +549,7 @@ async function load(){
   const s = seed(); try { await idbSet('db',s); } catch(e){} return s;
 }
 function normalize(d) {
-  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','notasdebito','guias','caja','gastos','ordenescompra','importaciones','letras','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
+  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','notasdebito','guias','caja','gastos','ordenescompra','importaciones','letras','retenciones','percepciones','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
   const s = seed();
   if(!Array.isArray(d.tipocambio) || !d.tipocambio.length) d.tipocambio = s.tipocambio;
   d.cat = d.cat || {};
@@ -597,6 +601,8 @@ const SERIES = {
   NOTA_CREDITO: { serie:'FC01', pad:6, sep:'-' },
   NOTA_DEBITO:  { serie:'FD01', pad:6, sep:'-' },
   GUIA:         { serie:'T001', pad:6, sep:'-' },
+  RETENCION:    { serie:'R001', pad:6, sep:'-' },
+  PERCEPCION:   { serie:'P001', pad:6, sep:'-' },
   COMPRA:       { serie:'F-',   pad:0, sep:''  },
 };
 function nextNumero(tipo){
@@ -680,6 +686,8 @@ const MENU = [
   { id:'cobrar', label:'Cuentas por Cobrar', icon:'cobrar' },
   { id:'pagos', label:'Cuentas por Pagar', icon:'cobrar' },
   { id:'letras', label:'Letras', icon:'cobrar' },
+  { id:'percepciones', label:'Percepciones', icon:'cobrar' },
+  { id:'retenciones', label:'Retenciones', icon:'cobrar' },
   { id:'caja', label:'Caja Chica', icon:'money' },
   { key:'reportes', label:'Reportes', icon:'reportes', children:[
     { id:'reportes', label:'Panel de Reportes' },
@@ -2793,6 +2801,86 @@ function letraModal(){
     persist().then(()=>{renderLetras();toast(n+' letra(s) generada(s)','success');}).catch(()=>toast('No se pudo guardar','error'));
     return true;
   });
+}
+
+/* ---------- RETENCIONES / PERCEPCIONES (regímenes SUNAT) ---------- */
+const TRIBUTOS = {
+  retenciones: { sing:'retención', titulo:'Retenciones', sub:'IGV retenido al pagar a proveedores (agente de retención, 3%)', tipo:'RETENCION', entLabel:'Proveedor', col:'retenciones', tasa:3, accion:'Retenido', docTipo:'COMPROBANTE DE RETENCIÓN', ents:()=>DB.proveedores },
+  percepciones:{ sing:'percepción', titulo:'Percepciones', sub:'IGV percibido al cliente en la venta (agente de percepción, 2%)', tipo:'PERCEPCION', entLabel:'Cliente', col:'percepciones', tasa:2, accion:'Percibido', docTipo:'COMPROBANTE DE PERCEPCIÓN', ents:()=>DB.clientes },
+};
+['retenciones','percepciones'].forEach(k=>{ VIEWS[k]=(el)=>renderTributo(el,k); });
+function renderTributo(el, key){
+  const cfg=TRIBUTOS[key]; const list=DB[cfg.col];
+  const total=list.reduce((s,r)=>s+Number(r.importe||0),0);
+  const mes=new Date().toISOString().slice(0,7);
+  const totalMes=list.filter(r=>(r.fecha||'').slice(0,7)===mes).reduce((s,r)=>s+Number(r.importe||0),0);
+  el.innerHTML=`<div class="page-head"><div><h1>${cfg.titulo}</h1><p>${cfg.sub}</p></div>
+    <button class="btn btn-primary" id="addT">${ICN.plus} Nueva ${cfg.sing}</button></div>
+    <div class="kpi-grid">
+      ${kpiCard('money','var(--brand)','var(--brand-soft)','Total '+cfg.accion.toLowerCase(),money(total),list.length+' comprobantes',null)}
+      ${kpiCard('money','var(--amber)','var(--amber-soft)','Del mes',money(totalMes),mes,null)}
+    </div>
+    <div class="card"><div class="section-title">Comprobantes de ${cfg.sing}</div><div class="table-wrap">
+    <table><thead><tr><th>Número</th><th>${cfg.entLabel}</th><th>Doc.</th><th>Fecha</th><th style="text-align:right">Base</th><th style="text-align:center">%</th><th style="text-align:right">${cfg.accion}</th><th></th></tr></thead><tbody>
+    ${list.map(r=>`<tr><td class="cell-mono cell-strong">${r.num}</td><td class="cell-strong">${r.entidad}</td><td class="cell-mono">${r.docRef||'—'}</td><td>${fmtDate(r.fecha)}</td><td style="text-align:right" class="cell-mono">${money(r.base)}</td><td style="text-align:center">${r.tasa}%</td><td style="text-align:right" class="cell-strong">${money(r.importe)}</td>
+      <td><div class="row-actions"><button class="icon-btn" title="Imprimir" data-pt="${r.id}">${ICN.print}</button><button class="icon-btn del" data-del="${r.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(8)}
+    </tbody></table></div></div>`;
+  document.getElementById('addT').onclick=()=>tributoModal(key);
+  el.querySelectorAll('[data-pt]').forEach(x=>x.onclick=()=>printTributo(DB[cfg.col].find(r=>r.id===x.dataset.pt), cfg));
+  el.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>confirmDialog('¿Eliminar comprobante?','',()=>{DB[cfg.col]=DB[cfg.col].filter(r=>r.id!==x.dataset.del);save();renderTributo(el,key);toast('Comprobante eliminado','success');}));
+}
+function tributoModal(key){
+  const cfg=TRIBUTOS[key]; const ents=cfg.ents(); const hoy=new Date().toISOString().slice(0,10);
+  openModal('Nueva '+cfg.sing,`<div class="form-grid">
+    <div class="field full"><label>${cfg.entLabel} <span class="req">*</span></label><select id="t_ent">${ents.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')||'<option value="">(sin registros)</option>'}</select></div>
+    <div class="field"><label>Documento relacionado</label><input id="t_doc" placeholder="Ej. F001-000123"/></div>
+    <div class="field"><label>Fecha</label><input id="t_fecha" type="date" value="${hoy}"/></div>
+    <div class="field"><label>Base (S/) <span class="req">*</span></label><input id="t_base" type="number" step="0.01"/></div>
+    <div class="field"><label>Tasa %</label><input id="t_tasa" type="number" step="0.01" value="${cfg.tasa}"/></div>
+  </div><div id="t_prev" style="margin-top:12px;padding:12px 14px;background:var(--surface-2);border-radius:10px;font-weight:700;color:var(--brand)">${cfg.accion}: S/ 0.00</div>`,()=>{
+    const ent=ents.find(e=>e.id===val('t_ent'));
+    const base=parseFloat(val('t_base'))||0, tasa=parseFloat(val('t_tasa'))||cfg.tasa;
+    if(base<=0){toast('Ingresa la base','error');return false;}
+    const importe=Math.round(base*tasa/100*100)/100;
+    const doc={ id:uid(), num:null, tipo:cfg.tipo, entidadId:val('t_ent'), entidad:ent?ent.nombre:'—', docRef:val('t_doc'), fecha:val('t_fecha')||hoy, base, tasa, importe, usuario:usuarioActual(), creado:new Date().toISOString() };
+    commit(()=>{ doc.num=nextNumero(cfg.tipo); DB[cfg.col].unshift(doc); })
+      .then(()=>{ go(key); toast('Comprobante '+doc.num+' generado','success'); })
+      .catch(()=>toast('No se pudo guardar','error'));
+    return true;
+  });
+  const upd=()=>{ const base=parseFloat(val('t_base'))||0, tasa=parseFloat(val('t_tasa'))||cfg.tasa; const el2=document.getElementById('t_prev'); if(el2) el2.textContent=cfg.accion+': '+money(Math.round(base*tasa/100*100)/100); };
+  setTimeout(()=>{ ['t_base','t_tasa'].forEach(id=>{const e2=document.getElementById(id); if(e2)e2.oninput=upd;}); },40);
+}
+function printTributo(r, cfg){
+  if(!r) return;
+  const w=window.open('','_blank','width=760,height=800'); if(!w){toast('Permite las ventanas emergentes','error');return;}
+  const logo=(DB.config&&DB.config.logo)||'assets/jl-logo.png';
+  const fn=n=>'S/ '+(Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  w.document.write(`<html><head><title>${cfg.docTipo} ${r.num}</title><meta charset="utf-8"><style>
+    *{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12px;padding:28px;max-width:760px;margin:auto}
+    .top{display:flex;gap:14px;align-items:center;border-bottom:2px solid #111;padding-bottom:12px}
+    .brand img{max-width:130px;max-height:70px}.co{flex:1;text-align:center;line-height:1.4}.co-name{font-size:15px;font-weight:800}
+    .rucbox{width:210px;border:2px solid #111;border-radius:6px;text-align:center;overflow:hidden}
+    .rucbox .ruc{font-weight:800;padding:6px;border-bottom:1px solid #111}.rucbox .tipo{font-weight:800;padding:7px;font-size:12px}.rucbox .num{background:#111;color:#fff;font-weight:800;padding:6px}
+    .box{border:1px solid #111;border-radius:6px;padding:12px 14px;margin-top:14px;line-height:1.9}
+    .tot{margin-top:16px;margin-left:auto;width:300px}.tot div{display:flex;justify-content:space-between;padding:7px 12px;border:1px solid #ccc;border-top:none}
+    .tot div:first-child{border-top:1px solid #ccc}.tot .g{background:#111;color:#fff;font-weight:800;font-size:15px}
+    @media print{body{padding:0}}
+  </style></head><body>
+    <div class="top"><div class="brand"><img src="${logo}" onerror="this.style.display='none'"></div>
+      <div class="co"><div class="co-name">${COMPANY.nombre}</div><div>${COMPANY.direccion}</div><div>${COMPANY.telefonos}</div></div>
+      <div class="rucbox"><div class="ruc">R.U.C. ${COMPANY.ruc}</div><div class="tipo">${cfg.docTipo}</div><div class="num">${r.num}</div></div></div>
+    <div class="box"><b>${cfg.entLabel.toUpperCase()}:</b> ${r.entidad||'—'}<br><b>DOCUMENTO RELACIONADO:</b> ${r.docRef||'—'}<br><b>FECHA:</b> ${fmtDate(r.fecha)}</div>
+    <div class="tot">
+      <div><span>Base imponible</span><span>${fn(r.base)}</span></div>
+      <div><span>Tasa aplicada</span><span>${r.tasa}%</span></div>
+      <div class="g"><span>${cfg.accion.toUpperCase()}</span><span>${fn(r.importe)}</span></div>
+    </div>
+    <div class="box" style="border:none;margin-top:8px">SON: ${montoEnLetras(r.importe,'S/')}</div>
+    <p style="margin-top:36px;font-size:11px;color:#555;text-align:center">Representación impresa del ${cfg.docTipo.toLowerCase()} — ${COMPANY.web}</p>
+    <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`);
+  w.document.close();
 }
 
 /* ---------- REPORTES GERENCIALES ---------- */
