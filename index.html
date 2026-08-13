@@ -912,6 +912,7 @@ const NORM={};
 function nearWhite(d,i){return d[i]>240&&d[i+1]>240&&d[i+2]>240;}
 function normalizeOne(img){
   const pid=img.dataset.pid; if(!pid||NORM[pid])return;
+  if((img.dataset.cat||'')!=='Aretes'){NORM[pid]=img.src;return;} // solo aretes; collares/pulseras se ven mejor con su foto original
   const nw=img.naturalWidth,nh=img.naturalHeight; if(!nw||!nh)return;
   const maxD=440,sc=Math.min(1,maxD/Math.max(nw,nh));
   const w=Math.max(1,Math.round(nw*sc)),h=Math.max(1,Math.round(nh*sc));
@@ -928,7 +929,7 @@ function normalizeOne(img){
   const bw=maxx-minx,bh=maxy-miny;
   if(bw>w*0.94&&bh>h*0.94){NORM[pid]=img.src;return;} // ya llena, no hace falta
   const cx=(minx+maxx)/2,cy=(miny+maxy)/2;
-  let side=Math.max(bw,bh)*1.22;                        // joya + 22% de margen
+  let side=Math.max(bw,bh)*1.18;                        // aretes: joya + 18% de margen
   const inv=1/sc; let ss=side*inv, sx=cx*inv-ss/2, sy=cy*inv-ss/2;
   sx=Math.max(0,Math.min(sx,nw-1));sy=Math.max(0,Math.min(sy,nh-1));ss=Math.min(ss,nw-sx,nh-sy);
   const OS=Math.min(700,Math.round(ss));const o=document.createElement('canvas');o.width=OS;o.height=OS;
@@ -960,7 +961,7 @@ function renderGrid(){
     <div class="prod-card reveal ${'d'+((i%3)+1)} in${p.agotado?' is-out':''}">
       <div class="prod-media">
         ${badge}
-        ${imgSrc(p)?`<img src="${NORM[p.id]||imgSrc(p)}" data-pid="${p.id}" alt="${p.nombre}" loading="lazy" onerror="this.style.display='none';this.insertAdjacentHTML('afterend', ORNATA_FB(this))" data-fb='${encodeURIComponent(fallback(p))}'>`:fallback(p)}
+        ${imgSrc(p)?`<img src="${NORM[p.id]||imgSrc(p)}" data-pid="${p.id}" data-cat="${p.categoria}" alt="${p.nombre}" loading="lazy" onerror="this.style.display='none';this.insertAdjacentHTML('afterend', ORNATA_FB(this))" data-fb='${encodeURIComponent(fallback(p))}'>`:fallback(p)}
       </div>
       <div class="prod-body">
         <p class="cat">${p.categoria}</p>
