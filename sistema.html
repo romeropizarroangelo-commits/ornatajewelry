@@ -1371,7 +1371,9 @@ function validarStock(lines){
 function deudaCliente(clienteId){
   const vv=DB.ventas.filter(v=>v.clienteId===clienteId && esPendienteDoc(v)).reduce((s,v)=>s+docSaldo(v),0);
   const nd=(DB.notasdebito||[]).filter(n=>n.clienteId===clienteId && n.estado==='Pendiente').reduce((s,n)=>s+Number(n.total||0),0);
-  return vv+nd;
+  // Deuda que ya pasó a letras (canje) sigue contando para el crédito: la factura se canjeó, pero el cliente aún debe.
+  const lt=(DB.letras||[]).filter(l=>l.tipo==='cobrar' && l.entidadId===clienteId && l.estado!=='Pagada').reduce((s,l)=>s+Number(l.saldo!=null?l.saldo:l.monto||0),0);
+  return vv+nd+lt;
 }
 function chequeoCredito(clienteId, total){
   const c=DB.clientes.find(x=>x.id===clienteId); if(!c) return {ok:true};
@@ -2978,13 +2980,33 @@ function generarLetras(montoTotal, n, venc0){
   for(let i=0;i<n;i++){ const monto = i===n-1 ? Math.round((montoTotal-cuota*(n-1))*100)/100 : cuota; out.push({ monto, fechaVencimiento: addMonths(venc0, i) }); }
   return out;
 }
+/* Canje de facturas → letras (Letras de Compra/Venta). PURO y testeable.
+   Toma los documentos seleccionados (ventas o compras), transfiere su saldo a N letras
+   (que suman EXACTAMENTE el total) y marca cada factura como 'Canjeada' (saldo 0 → sale de CxC/CxP).
+   El total NO se pierde: pasa de "facturas por pagar/cobrar" a "letras". */
+function canjearDocs(docs, ids, n, venc0, meta){
+  const sel=(docs||[]).filter(d=>ids.includes(d.id) && esPendienteDoc(d));
+  const total=R2(sel.reduce((s,d)=>s+docSaldo(d),0));
+  if(!sel.length || total<=0) return { total:0, letras:[], canjeadas:[] };
+  const cuotas=generarLetras(total, n, venc0);
+  sel.forEach(d=>{ d.canjeadaLetra=meta.grupo; d.saldo=0; d.estado='Canjeada'; });
+  const docRef=sel.map(d=>d.num).join(', ');
+  const letras=cuotas.map((q,i)=>({
+    id:uid(), num:(n>1?meta.base+'-'+(i+1)+'/'+n:meta.base), tipo:meta.tipo, grupo:meta.grupo,
+    entidadId:meta.entidadId||'', entidad:meta.entidad, docIds:sel.map(d=>d.id), docRef,
+    monto:q.monto, saldo:q.monto, fechaEmision:meta.hoy, fechaVencimiento:q.fechaVencimiento,
+    estado:'Pendiente', banco:meta.banco||'', moneda:meta.moneda||'S/', usuario:meta.usuario||'' }));
+  return { total, letras, canjeadas:sel.map(d=>d.id) };
+}
 VIEWS.letras=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Letras</h1><p>Control de pagos a plazo (letras de cambio)</p></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><div class="segmented" id="segLT"><button data-t="cobrar" class="${letrasTipo==='cobrar'?'active':''}">Por Cobrar</button><button data-t="pagar" class="${letrasTipo==='pagar'?'active':''}">Por Pagar</button></div>
+    <button class="btn btn-ghost" id="canjeFact">${ICN.plus} Canje de facturas</button>
     <button class="btn btn-primary" id="addLetra">${ICN.plus} Nueva letra</button></div></div>
     <div id="ltBody"></div>`;
   el.querySelectorAll('#segLT button').forEach(b=>b.onclick=()=>{letrasTipo=b.dataset.t;VIEWS.letras(el);});
   document.getElementById('addLetra').onclick=()=>letraModal();
+  document.getElementById('canjeFact').onclick=()=>canjeDocModal();
   renderLetras();
 };
 function renderLetras(){
@@ -3025,6 +3047,67 @@ function letraModal(){
     persist().then(()=>{renderLetras();toast(n+' letra(s) generada(s)','success');}).catch(()=>toast('No se pudo guardar','error'));
     return true;
   });
+}
+/* Canje de facturas → letras (Letras de Compra si tab=pagar, de Venta si tab=cobrar). */
+function canjeDocModal(){
+  const esPagar=letrasTipo==='pagar';
+  const ents=esPagar?DB.proveedores:DB.clientes;
+  const entLabel=esPagar?'Proveedor':'Cliente';
+  const hoy=new Date().toISOString().slice(0,10);
+  openModal('Canje de facturas en letras · '+(esPagar?'Letras de Compra':'Letras de Venta'),`
+    <div class="form-grid">
+      <div class="field full"><label>${entLabel} <span class="req">*</span></label><select id="cj_ent"><option value="">— Selecciona —</option>${ents.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')||'<option value="">(sin registros)</option>'}</select></div>
+      <div class="field"><label>Nº de letras</label><input id="cj_n" type="number" min="1" max="36" value="1"></div>
+      <div class="field"><label>1er vencimiento</label><input id="cj_venc" type="date" value="${hoy}"></div>
+      <div class="field"><label>Banco</label><input id="cj_banco" placeholder="BCP, BBVA…"></div>
+    </div>
+    <div id="cj_box" style="margin-top:8px"><p style="color:var(--ink-3)">Elige un ${entLabel.toLowerCase()} para ver sus facturas pendientes y convertirlas en letras.</p></div>
+  `, ()=>{
+    const entId=val('cj_ent'); const ent=ents.find(e=>e.id===entId);
+    if(!ent){ toast('Selecciona un '+entLabel.toLowerCase(),'error'); return false; }
+    const ids=[...document.querySelectorAll('.cj-fac:checked')].map(c=>c.dataset.id);
+    if(!ids.length){ toast('Marca al menos una factura para canjear','error'); return false; }
+    const n=Math.max(1,parseInt(val('cj_n'))||1), venc0=val('cj_venc')||hoy, banco=val('cj_banco');
+    const docsArr=esPagar?DB.compras:DB.ventas;
+    const grupo=uid(), base='LC-'+String(1000+DB.letras.length+1);
+    let creadas=0;
+    commit(()=>{
+      const r=canjearDocs(docsArr, ids, n, venc0, { grupo, base, tipo:letrasTipo, entidadId:entId, entidad:ent.nombre, hoy, banco, moneda:'S/', usuario:usuarioActual() });
+      if(!r.letras.length) throw new Error('las facturas seleccionadas no tienen saldo');
+      r.letras.forEach(l=>DB.letras.unshift(l)); creadas=r.letras.length;
+    }).then(()=>{ renderLetras(); toast(creadas+' letra(s) generada(s) por canje','success'); })
+      .catch(e=>toast('No se pudo canjear: '+(e.message||''),'error'));
+    return true;
+  });
+  const sel=document.getElementById('cj_ent'); if(sel) sel.onchange=cjRenderBox;
+  ['cj_n','cj_venc'].forEach(id=>{ const e=document.getElementById(id); if(e) e.oninput=cjRefreshPreview; });
+}
+function cjRenderBox(){
+  const box=document.getElementById('cj_box'); if(!box) return;
+  const esPagar=letrasTipo==='pagar';
+  const docsArr=esPagar?DB.compras:DB.ventas, entKey=esPagar?'proveedor':'cliente';
+  const ents=esPagar?DB.proveedores:DB.clientes, ent=ents.find(e=>e.id===val('cj_ent'));
+  if(!ent){ box.innerHTML='<p style="color:var(--ink-3)">Elige para ver sus facturas.</p>'; return; }
+  const facs=docsArr.filter(d=>d[entKey]===ent.nombre && esPendienteDoc(d));
+  box.innerHTML=`<div class="grid-2">
+    <div class="card"><div class="section-title">Facturas pendientes (${facs.length})</div><div class="table-wrap">
+      <table><thead><tr><th></th><th>Documento</th><th>Emisión</th><th style="text-align:right">Saldo</th></tr></thead><tbody>
+      ${facs.map(d=>`<tr><td><input type="checkbox" class="cj-fac" data-id="${d.id}" data-saldo="${docSaldo(d)}" checked></td><td class="cell-mono cell-strong">${d.num}</td><td>${fmtDate(d.fecha)}</td><td style="text-align:right" class="cell-strong">${money2(docSaldo(d),d.moneda||'S/')}</td></tr>`).join('')||emptyRow(4)}
+      </tbody></table></div></div>
+    <div class="card"><div class="section-title">Letras a generar</div><div style="padding:14px" id="cj_prev"></div></div>
+  </div>`;
+  box.querySelectorAll('.cj-fac').forEach(c=>c.onchange=cjRefreshPreview);
+  cjRefreshPreview();
+}
+function cjRefreshPreview(){
+  const prev=document.getElementById('cj_prev'); if(!prev) return;
+  const total=R2([...document.querySelectorAll('.cj-fac:checked')].reduce((s,c)=>s+(Number(c.dataset.saldo)||0),0));
+  const n=Math.max(1,parseInt(val('cj_n'))||1), venc0=val('cj_venc')||new Date().toISOString().slice(0,10);
+  const cuotas=generarLetras(total,n,venc0);
+  const totLetras=R2(cuotas.reduce((s,q)=>s+q.monto,0));
+  prev.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="color:var(--ink-2)">Total facturas</span><span class="cell-strong">${money(total)}</span></div>
+    <div style="max-height:190px;overflow:auto">${cuotas.map((q,i)=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)"><span>Letra ${i+1}/${n} · vence ${fmtDate(q.fechaVencimiento)}</span><span class="cell-mono cell-strong">${money(q.monto)}</span></div>`).join('')||'<div style="color:var(--ink-3);padding:8px 0">Marca facturas para ver las letras.</div>'}</div>
+    <div style="display:flex;justify-content:space-between;margin-top:10px;font-weight:800"><span>Total letras</span><span style="color:${Math.abs(total-totLetras)<0.005?'var(--green)':'var(--red)'}">${money(totLetras)}</span></div>`;
 }
 
 /* ---------- LISTA DE PRECIOS ---------- */

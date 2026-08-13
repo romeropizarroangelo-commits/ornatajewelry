@@ -1364,7 +1364,9 @@ function validarStock(lines){
 function deudaCliente(clienteId){
   const vv=DB.ventas.filter(v=>v.clienteId===clienteId && esPendienteDoc(v)).reduce((s,v)=>s+docSaldo(v),0);
   const nd=(DB.notasdebito||[]).filter(n=>n.clienteId===clienteId && n.estado==='Pendiente').reduce((s,n)=>s+Number(n.total||0),0);
-  return vv+nd;
+  // Deuda que ya pasó a letras (canje) sigue contando para el crédito: la factura se canjeó, pero el cliente aún debe.
+  const lt=(DB.letras||[]).filter(l=>l.tipo==='cobrar' && l.entidadId===clienteId && l.estado!=='Pagada').reduce((s,l)=>s+Number(l.saldo!=null?l.saldo:l.monto||0),0);
+  return vv+nd+lt;
 }
 function chequeoCredito(clienteId, total){
   const c=DB.clientes.find(x=>x.id===clienteId); if(!c) return {ok:true};

@@ -359,6 +359,24 @@ Con SCHEMA_VERSION al día (`cierres:[]`, `empresas:[]` en seed + normalize) y m
 
 ---
 
+## LETRAS DE COMPRA — Canje de facturas (2026-08-12)
+
+> Captura del usuario: "Registro de Letras de Compra" (proveedor → adjuntar facturas → generar letras con vencimientos; Consulta con saldo/estado/PDF). Mi módulo Letras era un canje de un monto tecleado. Ahora canjea **facturas reales seleccionadas**.
+
+- ✅ **`canjearDocs(docs, ids, n, venc0, meta)`** (puro, testeado): toma las facturas seleccionadas (compras o ventas), **transfiere su saldo a N letras que suman EXACTO el total** (la última ajusta el redondeo, vía `generarLetras`), y marca cada factura como **'Canjeada'** con saldo 0 → sale de CxC/CxP. La deuda no se pierde: pasa de "facturas" a "letras".
+- ✅ **UI de canje** (`canjeDocModal` + `cjRenderBox`/`cjRefreshPreview`): botón "Canje de facturas" en Letras. Elige proveedor/cliente → ve sus facturas pendientes (checkboxes) → configura Nº de letras + 1er vencimiento + banco → **panel espejo Facturas ↔ Letras** con verificación de que **Total facturas = Total letras** (verde/rojo). GRABAR crea las letras (`commit` atómico) y canjea las facturas. Sirve para Letras de **Compra** (tab Por Pagar) y de **Venta** (tab Por Cobrar).
+- ✅ **Control de crédito honesto:** `deudaCliente` ahora suma también las **letras por cobrar pendientes** del cliente → canjear una factura a letra no libera crédito indebidamente (la factura se canjeó, pero el cliente sigue debiendo).
+
+**Verificación:** `tests/letras.test.js` ampliado a 9 (canje: total 500+300=800 preservado en 4 letras; facturas quedan Canjeadas/saldo 0; letras por pagar del proveedor; referencia a las facturas; doc sin saldo no genera letras). **Suite total: 137/137.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+**Siguiente:** Kardex con saldo corrido (Inicial/Ingreso/Salida/Final + almacén/TC/costo) y Registro de Compras con período/guía/distrito/atajos F1–F6. Pendiente menor de este módulo: reversa del canje (hoy no restaura la factura si borras la letra) e integrar letras por pagar dentro del panel de CxP.
+
+---
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.
