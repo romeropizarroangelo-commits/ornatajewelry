@@ -937,11 +937,13 @@ function normalizeOne(img){
   const url=o.toDataURL('image/jpeg',0.9);NORM[pid]=url;img.src=url;
 }
 function normalizeProductImages(){
+  const idle=window.requestIdleCallback||function(cb){return setTimeout(cb,16);};
   document.querySelectorAll('#prodGrid img[data-pid]').forEach(img=>{
     const pid=img.dataset.pid;
     if(NORM[pid]){if(img.src!==NORM[pid])img.src=NORM[pid];return;}
-    if(img.complete&&img.naturalWidth){normalizeOne(img);}
-    else img.addEventListener('load',()=>normalizeOne(img),{once:true});
+    const run=()=>idle(()=>normalizeOne(img));
+    if(img.complete&&img.naturalWidth){run();}
+    else img.addEventListener('load',run,{once:true});
   });
 }
 function renderGrid(){
