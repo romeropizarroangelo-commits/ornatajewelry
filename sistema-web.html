@@ -1348,7 +1348,9 @@ function addStock(p,qty){
   p.pri=(Number(p.pri)||0)+qty;
   p.stock=(Number(p.pri)||0)+(Number(p.cie)||0)+(Number(p.vit)||0);
 }
-function recordMov(p,tipo,doc,cant){ DB.movimientos.push({ id:uid(), fecha:new Date().toISOString().slice(0,10), prodId:p.id, codigo:p.codigo, desc:p.desc, tipo, doc, cant, usuario:usuarioActual() }); }
+// Registra un movimiento de kardex. `extra` (opcional) enriquece: {razon, costo, precio, tc, moneda, almacen}.
+// Por defecto guarda una foto del costo del producto en ese momento (para valorizar el kardex).
+function recordMov(p,tipo,doc,cant,extra){ DB.movimientos.push(Object.assign({ id:uid(), fecha:new Date().toISOString().slice(0,10), prodId:p.id, codigo:p.codigo, desc:p.desc, tipo, doc, cant, costo:Number(p.costo)||0, moneda:p.moneda||'S/', usuario:usuarioActual() }, extra||{})); }
 let emitLock=false;
 // Disponible = stock físico menos lo reservado (comprometido) por cotizaciones.
 function disponible(p){ return (Number(p.stock)||0) - (Number(p.reservado)||0); }
@@ -1395,7 +1397,7 @@ async function emitirVenta(){
   try {
     await commit(()=>{
       num = nextNumero(venta.tipo==='Boleta'?'BOLETA':'FACTURA');
-      venta.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);deductStock(p,l.cant);recordMov(p,'VENTA',num,-l.cant);});
+      venta.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);deductStock(p,l.cant);recordMov(p,'VENTA',num,-l.cant,{razon:(cli?cli.nombre:'Cliente varios'),precio:Number(l.precio)||0,tc:venta.tc,moneda:venta.moneda||'S/'});});
       DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:venta.clienteId, cliente:cli?cli.nombre:'Cliente varios', items:venta.lines.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:venta.metodo==='Crédito'?'Pendiente':'Pagada', saldo:(venta.metodo==='Crédito'?total:0), abonado:(venta.metodo==='Crédito'?0:total), metodo:venta.metodo, tc:venta.tc, referencia:venta.fromCotiz||'', usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
     });
   } catch(e){

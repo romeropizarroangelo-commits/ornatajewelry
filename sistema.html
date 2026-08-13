@@ -1355,7 +1355,9 @@ function addStock(p,qty){
   p.pri=(Number(p.pri)||0)+qty;
   p.stock=(Number(p.pri)||0)+(Number(p.cie)||0)+(Number(p.vit)||0);
 }
-function recordMov(p,tipo,doc,cant){ DB.movimientos.push({ id:uid(), fecha:new Date().toISOString().slice(0,10), prodId:p.id, codigo:p.codigo, desc:p.desc, tipo, doc, cant, usuario:usuarioActual() }); }
+// Registra un movimiento de kardex. `extra` (opcional) enriquece: {razon, costo, precio, tc, moneda, almacen}.
+// Por defecto guarda una foto del costo del producto en ese momento (para valorizar el kardex).
+function recordMov(p,tipo,doc,cant,extra){ DB.movimientos.push(Object.assign({ id:uid(), fecha:new Date().toISOString().slice(0,10), prodId:p.id, codigo:p.codigo, desc:p.desc, tipo, doc, cant, costo:Number(p.costo)||0, moneda:p.moneda||'S/', usuario:usuarioActual() }, extra||{})); }
 let emitLock=false;
 // Disponible = stock físico menos lo reservado (comprometido) por cotizaciones.
 function disponible(p){ return (Number(p.stock)||0) - (Number(p.reservado)||0); }
@@ -1402,7 +1404,7 @@ async function emitirVenta(){
   try {
     await commit(()=>{
       num = nextNumero(venta.tipo==='Boleta'?'BOLETA':'FACTURA');
-      venta.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);deductStock(p,l.cant);recordMov(p,'VENTA',num,-l.cant);});
+      venta.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);deductStock(p,l.cant);recordMov(p,'VENTA',num,-l.cant,{razon:(cli?cli.nombre:'Cliente varios'),precio:Number(l.precio)||0,tc:venta.tc,moneda:venta.moneda||'S/'});});
       DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:venta.clienteId, cliente:cli?cli.nombre:'Cliente varios', items:venta.lines.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:venta.metodo==='Crédito'?'Pendiente':'Pagada', saldo:(venta.metodo==='Crédito'?total:0), abonado:(venta.metodo==='Crédito'?0:total), metodo:venta.metodo, tc:venta.tc, referencia:venta.fromCotiz||'', usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
     });
   } catch(e){
@@ -1825,7 +1827,7 @@ async function emitirCompra(){
         addStock(p,l.cant);
         // Costo promedio ponderado. Si aún no había costo, se establece con esta compra.
         p.costo = (costoPrev>0 && stockPrev>0) ? (stockPrev*costoPrev + l.cant*Number(l.costo)) / (stockPrev+l.cant) : Number(l.costo)||0;
-        recordMov(p,'COMPRA',num,l.cant);});
+        recordMov(p,'COMPRA',num,l.cant,{razon:compra.proveedor,costo:Number(l.costo)||Number(p.costo)||0,tc:compra.tc,moneda:compra.moneda||'S/'});});
       DB.compras.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:compra.proveedor,items:compra.lines.reduce((s,l)=>s+l.cant,0),total,estado:compra.metodo==='Crédito'?'Pendiente':'Pagada',saldo:(compra.metodo==='Crédito'?total:0),abonado:(compra.metodo==='Crédito'?0:total),metodo:compra.metodo,usuario:usuarioActual(),creado:new Date().toISOString()});
     });
   } catch(e){ emitLock=false; if(btn) btn.disabled=false; toast('No se pudo guardar la compra. Reintenta.','error'); return; }
@@ -2159,7 +2161,7 @@ function cotizAFactura(id){
     try {
       await commit(()=>{
         num = nextNumero('FACTURA');
-        conProd.forEach(l=>{ const p=DB.productos.find(x=>x.id===l.prodId); if(reservada) p.reservado=Math.max(0,(Number(p.reservado)||0)-l.cant); deductStock(p,l.cant); recordMov(p,'VENTA',num,-l.cant); });
+        conProd.forEach(l=>{ const p=DB.productos.find(x=>x.id===l.prodId); if(reservada) p.reservado=Math.max(0,(Number(p.reservado)||0)-l.cant); deductStock(p,l.cant); recordMov(p,'VENTA',num,-l.cant,{razon:c.cliente,precio:Number(l.precio)||0,tc,moneda:c.moneda||'S/'}); });
         const cc=DB.cotizaciones.find(x=>x.id===c.id); if(cc) cc.estado='Facturada';
         DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:c.clienteId, cliente:c.cliente, items:lineas.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:'Pagada', saldo:0, abonado:total, metodo:'Contado', tc, referencia:c.num, usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
       });
@@ -2386,7 +2388,19 @@ function drawCaja(){
 }
 
 /* ---------- KARDEX ---------- */
-let kardexId=null;
+let kardexId=null, kxDesde='', kxHasta='', kxOper='TODOS', kxRazon='';
+// Saldo corrido del kardex (PURO): a partir del stock ACTUAL reconstruye el saldo tras cada
+// movimiento. saldoBase = stock − suma(movimientos) = existencia antes del primer movimiento.
+function kardexCorrido(movs, stockActual){
+  const net=(movs||[]).reduce((s,m)=>s+Number(m.cant||0),0);
+  const saldoBase=(Number(stockActual)||0)-net;
+  let saldo=saldoBase, ingresos=0, salidas=0; const filas=[];
+  (movs||[]).forEach(m=>{ const antes=saldo, cant=Number(m.cant||0); saldo+=cant;
+    if(cant>0) ingresos+=cant; else salidas+=-cant;
+    filas.push({ m, antes, saldo }); });
+  return { saldoBase, saldoFinal:saldo, ingresos, salidas, filas };
+}
+function kxStat(label,color,value){ return `<div style="flex:1;min-width:120px;border:1px solid var(--line);border-radius:10px;padding:12px 14px"><div style="font-size:10.5px;color:var(--ink-3);letter-spacing:.5px;text-transform:uppercase">${label}</div><div style="font-size:20px;font-weight:800;color:${color}">${value}</div></div>`; }
 function tipoBadge(t){ return t==='COMPRA'?'<span class="badge badge-green">COMPRA</span>':t==='VENTA'?'<span class="badge badge-red">VENTA</span>':`<span class="badge badge-gray">${t}</span>`; }
 VIEWS.kardex=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Kardex</h1><p>Movimientos de entrada y salida por producto</p></div></div>
@@ -2406,18 +2420,64 @@ VIEWS.kardex=(el)=>{
 };
 function renderKardex(){
   const b=document.getElementById('kxBody'); const p=DB.productos.find(x=>x.id===kardexId); if(!p){b.innerHTML='';return;}
-  const movs=DB.movimientos.filter(m=>m.prodId===kardexId);
-  const net=movs.reduce((s,m)=>s+Number(m.cant||0),0);
-  let saldo=(Number(p.stock)||0)-net;
-  const rows=movs.map(m=>{ saldo+=Number(m.cant||0); return `<tr><td>${fmtDate(m.fecha)}</td><td>${tipoBadge(m.tipo)}</td><td class="cell-mono">${m.doc||''}</td><td style="text-align:center;color:var(--green);font-weight:700">${m.cant>0?m.cant:''}</td><td style="text-align:center;color:var(--red);font-weight:700">${m.cant<0?-m.cant:''}</td><td style="text-align:center" class="cell-strong">${saldo}</td></tr>`; }).join('');
+  const all=DB.movimientos.filter(m=>m.prodId===kardexId);
+  const kc=kardexCorrido(all, p.stock);
+  const enRango=m=>(!kxDesde||String(m.fecha)>=kxDesde)&&(!kxHasta||String(m.fecha)<=kxHasta);
+  const operMatch=m=>kxOper==='TODOS'||m.tipo===kxOper;
+  const razonMatch=m=>!kxRazon||String(m.razon||'').toLowerCase().includes(kxRazon.toLowerCase());
+  // Aplicar filtros conservando el saldo corrido global:
+  let inicial=null, ing=0, sal=0, valor=0; const filas=[];
+  kc.filas.forEach(f=>{ const m=f.m; if(enRango(m)&&operMatch(m)&&razonMatch(m)){
+    if(inicial===null) inicial=f.antes; const cant=Number(m.cant||0);
+    if(cant>0) ing+=cant; else sal+=-cant;
+    const costo=Number(m.costo!=null?m.costo:p.costo)||0; valor+=Math.abs(cant)*costo;
+    filas.push({...f, costo}); } });
+  if(inicial===null) inicial=kc.saldoBase;
+  const final=filas.length?filas[filas.length-1].saldo:inicial;
+  const tipos=[...new Set(all.map(m=>m.tipo))];
+  const activo=(kxDesde||kxHasta||kxOper!=='TODOS'||kxRazon);
   b.innerHTML=`<div class="card">
     <div style="padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-      <div><div style="font-size:16px;font-weight:700">${p.desc}</div><div class="cell-mono" style="color:var(--brand);margin-top:2px">${p.codigo}${p.codFab?' ↔ '+p.codFab:''}</div></div>
-      <div style="text-align:right"><div style="font-size:11px;color:var(--ink-3);letter-spacing:.5px">STOCK ACTUAL</div><div style="font-size:26px;font-weight:800">${p.stock}</div></div>
+      <div><div style="font-size:16px;font-weight:700">${p.desc}</div><div class="cell-mono" style="color:var(--brand);margin-top:2px">${p.codigo}${p.codFab?' ↔ '+p.codFab:''}${p.um?' · '+p.um:''}</div></div>
+      <div style="display:flex;align-items:center;gap:18px">
+        <button class="btn btn-ghost btn-sm" id="kxPrint">${ICN.print} Imprimir</button>
+        <div style="text-align:right"><div style="font-size:11px;color:var(--ink-3);letter-spacing:.5px">STOCK ACTUAL</div><div style="font-size:26px;font-weight:800">${p.stock}</div></div>
+      </div>
     </div>
-    <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Documento</th><th style="text-align:center">Entrada</th><th style="text-align:center">Salida</th><th style="text-align:center">Saldo</th></tr></thead><tbody>
-    ${rows||`<tr><td colspan="6" class="empty" style="padding:40px">Sin movimientos registrados aún.<br><span style="font-size:12px;color:var(--ink-3)">Se generan automáticamente al hacer ventas y compras.</span></td></tr>`}
+    <div style="padding:14px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0"><label>Desde</label><input type="date" id="kxDesde" value="${kxDesde}"></div>
+      <div class="field" style="margin:0"><label>Hasta</label><input type="date" id="kxHasta" value="${kxHasta}"></div>
+      <div class="field" style="margin:0"><label>Operación</label><select id="kxOper"><option value="TODOS">Todas</option>${tipos.map(t=>`<option value="${t}" ${kxOper===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;min-width:200px"><label>Razón social</label><input id="kxRazon" value="${(kxRazon||'').replace(/"/g,'&quot;')}" placeholder="Cliente / proveedor"></div>
+      ${activo?`<button class="btn btn-ghost btn-sm" id="kxClear">Limpiar filtros</button>`:''}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)">
+      ${kxStat('Saldo inicial','var(--ink-2)',inicial)}
+      ${kxStat('Ingresos','var(--green)','+'+ing)}
+      ${kxStat('Salidas','var(--red)','−'+sal)}
+      ${kxStat('Saldo final','var(--brand)',final)}
+      ${kxStat('Valor movido (costo)','var(--purple)',money(valor))}
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Operación</th><th>Razón social</th><th>Documento</th><th style="text-align:right">Costo</th><th style="text-align:center">Ingreso</th><th style="text-align:center">Salida</th><th style="text-align:center">Saldo</th></tr></thead><tbody>
+    ${filas.map(f=>{const m=f.m,cant=Number(m.cant||0);return `<tr><td>${fmtDate(m.fecha)}</td><td>${tipoBadge(m.tipo)}</td><td>${m.razon||'—'}</td><td class="cell-mono">${m.doc||''}</td><td style="text-align:right" class="cell-mono">${f.costo?money2(f.costo,m.moneda||p.moneda):'—'}</td><td style="text-align:center;color:var(--green);font-weight:700">${cant>0?cant:''}</td><td style="text-align:center;color:var(--red);font-weight:700">${cant<0?-cant:''}</td><td style="text-align:center" class="cell-strong">${f.saldo}</td></tr>`;}).join('')||`<tr><td colspan="8" class="empty" style="padding:40px">Sin movimientos ${activo?'en el filtro':'registrados aún'}.<br><span style="font-size:12px;color:var(--ink-3)">Se generan automáticamente al vender, comprar, importar y ajustar.</span></td></tr>`}
     </tbody></table></div></div>`;
+  const bind=(id,ev,fn)=>{const e=document.getElementById(id);if(e)e[ev]=fn;};
+  bind('kxDesde','onchange',e=>{kxDesde=e.target.value;renderKardex();});
+  bind('kxHasta','onchange',e=>{kxHasta=e.target.value;renderKardex();});
+  bind('kxOper','onchange',e=>{kxOper=e.target.value;renderKardex();});
+  bind('kxRazon','onchange',e=>{kxRazon=e.target.value;renderKardex();});
+  bind('kxClear','onclick',()=>{kxDesde='';kxHasta='';kxOper='TODOS';kxRazon='';renderKardex();});
+  bind('kxPrint','onclick',()=>printKardex(p, filas, {inicial,ing,sal,final,valor}));
+}
+function printKardex(p, filas, t){
+  const w=window.open('','_blank','width=900,height=1000'); if(!w){toast('Permite las ventanas emergentes','error');return;}
+  const rows=filas.map(f=>{const m=f.m,cant=Number(m.cant||0);return `<tr><td>${fmtDate(m.fecha)}</td><td>${m.tipo}</td><td>${m.razon||''}</td><td>${m.doc||''}</td><td class="r">${f.costo?money2(f.costo,m.moneda||p.moneda):''}</td><td class="c">${cant>0?cant:''}</td><td class="c">${cant<0?-cant:''}</td><td class="c">${f.saldo}</td></tr>`;}).join('');
+  w.document.write(`<html><head><title>Kardex ${p.codigo}</title><meta charset="utf-8"><style>body{font-family:Arial;font-size:11px;padding:24px;color:#111}h1{color:#e01f26;font-size:16px;margin:0}table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#111;color:#fff;padding:5px;text-align:left;font-size:10px}td{padding:4px 5px;border-bottom:1px solid #eee}td.r{text-align:right}td.c{text-align:center}.sum{margin-top:8px;color:#444}@media print{body{padding:0}}</style></head><body>
+    <h1>${COMPANY.nombre}</h1><div>Kardex · ${p.codigo} — ${p.desc}${kxDesde||kxHasta?` · ${kxDesde||'inicio'} a ${kxHasta||'hoy'}`:''}</div>
+    <div class="sum">Saldo inicial: <b>${t.inicial}</b> · Ingresos: <b>+${t.ing}</b> · Salidas: <b>−${t.sal}</b> · Saldo final: <b>${t.final}</b> · Valor movido: <b>${money(t.valor)}</b></div>
+    <table><thead><tr><th>Fecha</th><th>Operación</th><th>Razón social</th><th>Documento</th><th class="r">Costo</th><th class="c">Ingreso</th><th class="c">Salida</th><th class="c">Saldo</th></tr></thead><tbody>${rows}</tbody></table>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
 }
 
 /* ---------- AJUSTE DE INVENTARIO ---------- */
@@ -2851,7 +2911,7 @@ function recibirOC(id){
     const num='F-'+String(2200+DB.compras.length+6);
     try{
       await commit(()=>{
-        (o.lineas||[]).forEach(l=>{ if(l.prodId){ const p=DB.productos.find(x=>x.id===l.prodId); if(p){ const stockPrev=Number(p.stock)||0,costoPrev=Number(p.costo)||0; addStock(p,l.cant); p.costo=(costoPrev>0&&stockPrev>0)?(stockPrev*costoPrev+l.cant*Number(l.costo))/(stockPrev+l.cant):Number(l.costo)||0; recordMov(p,'COMPRA',o.num,l.cant); } } });
+        (o.lineas||[]).forEach(l=>{ if(l.prodId){ const p=DB.productos.find(x=>x.id===l.prodId); if(p){ const stockPrev=Number(p.stock)||0,costoPrev=Number(p.costo)||0; addStock(p,l.cant); p.costo=(costoPrev>0&&stockPrev>0)?(stockPrev*costoPrev+l.cant*Number(l.costo))/(stockPrev+l.cant):Number(l.costo)||0; recordMov(p,'COMPRA',o.num,l.cant,{razon:o.proveedor,costo:Number(l.costo)||Number(p.costo)||0}); } } });
         const oo=DB.ordenescompra.find(x=>x.id===id); if(oo) oo.estado='Recibida';
         DB.compras.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:o.proveedor,items:o.items,total:o.total,estado:'Pendiente',saldo:o.total,abonado:0,metodo:'Crédito',usuario:usuarioActual(),creado:new Date().toISOString(),ocNum:o.num});
       });
@@ -2960,7 +3020,7 @@ function recibirImp(id){
           const landedEnProducto=convMoneda(l.landedUnit, o.moneda, p.moneda, o.tc);
           addStock(p,l.cant);
           p.costo=(costoPrev>0&&stockPrev>0)?(stockPrev*costoPrev+l.cant*landedEnProducto)/(stockPrev+l.cant):landedEnProducto;
-          recordMov(p,'COMPRA',o.num,l.cant);
+          recordMov(p,'IMPORTACION',o.num,l.cant,{razon:o.proveedor||'Importación',costo:landedEnProducto,moneda:p.moneda||'S/'});
         } } });
         const oo=DB.importaciones.find(x=>x.id===id); if(oo) oo.estado='Recibida';
       });

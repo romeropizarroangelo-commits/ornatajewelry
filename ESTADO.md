@@ -377,6 +377,24 @@ Con SCHEMA_VERSION al día (`cierres:[]`, `empresas:[]` en seed + normalize) y m
 
 ---
 
+## KARDEX POTENTE — saldo corrido + resumen + filtros (2026-08-12)
+
+> Captura del usuario: Kardex del SGAE con resumen (STOCK/INGRESOS/SALIDAS/COSTO), filtros (artículo, fechas, operación, razón social, sucursal) y columnas Inicial/Ingreso/Salida/Final + almacén/TC/costo/precio por movimiento. Mi Kardex mostraba solo Fecha/Tipo/Doc/Entrada/Salida/Saldo.
+
+- ✅ **`kardexCorrido(movs, stockActual)`** (puro, testeado): reconstruye el saldo tras cada movimiento partiendo del **stock actual** (`saldoBase = stock − Σmovs`). El **saldo final del kardex siempre = stock actual** (cuadra por construcción). Devuelve filas con `antes`/`saldo`, ingresos y salidas.
+- ✅ **Movimientos enriquecidos** (`recordMov` con `extra` opcional, compatible hacia atrás): cada movimiento guarda **foto del costo** del producto y, cuando hay contexto, **razón social** (cliente/proveedor), precio, TC y moneda. Aplicado en venta, cotización→factura, compra, recepción de OC e importación (nueva op `IMPORTACION`).
+- ✅ **Vista rediseñada** (`renderKardex`): cabecera con stock actual + **Imprimir**; **filtros** Desde/Hasta, Operación (auto-detecta los tipos), Razón social, con "Limpiar"; **resumen** Saldo inicial / Ingresos / Salidas / Saldo final / Valor movido (a costo) **respetando el filtro** (el saldo corrido se mantiene global); tabla con Fecha, Operación, Razón social, Documento, Costo, Ingreso, Salida, Saldo. **Impresión** del kardex filtrado con membrete.
+
+**Verificación:** `tests/kardex.test.js` — 9/9 (saldo corrido 6→11→8→10 con stock 10; **saldo final = stock actual**; ingresos/salidas; sin movimientos → base=stock; recordMov guarda costo y acepta extra). **Suite total: 146/146.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+**Siguiente:** Registro de Compras con período tributario (202608), guía, distrito y atajos F1–F6.
+
+---
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.
