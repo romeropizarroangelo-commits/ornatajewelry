@@ -907,6 +907,43 @@ function priceHtml(p){
   if(tieneOferta(p)) return '<span class="price"><span class="price-old">'+money(p.precio)+'</span> '+money(p.oferta)+'</span>';
   return '<span class="price">'+money(p.precio)+'</span>';
 }
+/* ---- normalización de imágenes de fondo blanco (recorta el blanco y deja la joya a tamaño uniforme) ---- */
+const NORM={};
+function nearWhite(d,i){return d[i]>240&&d[i+1]>240&&d[i+2]>240;}
+function normalizeOne(img){
+  const pid=img.dataset.pid; if(!pid||NORM[pid])return;
+  const nw=img.naturalWidth,nh=img.naturalHeight; if(!nw||!nh)return;
+  const maxD=440,sc=Math.min(1,maxD/Math.max(nw,nh));
+  const w=Math.max(1,Math.round(nw*sc)),h=Math.max(1,Math.round(nh*sc));
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,w,h);
+  let d; try{d=ctx.getImageData(0,0,w,h).data;}catch(e){NORM[pid]=img.src;return;}
+  // ¿fondo blanco? (las 4 esquinas casi blancas). Si no, es plantilla → no tocar.
+  const corner=(x,y)=>{let ok=0,t=0;for(let a=0;a<7;a++)for(let b=0;b<7;b++){const i=(((y+a)*w)+(x+b))*4;t++;if(nearWhite(d,i))ok++;}return ok/t>0.7;};
+  if(!(corner(0,0)&&corner(w-7,0)&&corner(0,h-7)&&corner(w-7,h-7))){NORM[pid]=img.src;return;}
+  // caja de la joya (píxeles no blancos)
+  let minx=w,miny=h,maxx=0,maxy=0,found=false;
+  for(let y=0;y<h;y++){const row=y*w;for(let x=0;x<w;x++){if(!nearWhite(d,(row+x)*4)){found=true;if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;}}}
+  if(!found){NORM[pid]=img.src;return;}
+  const bw=maxx-minx,bh=maxy-miny;
+  if(bw>w*0.94&&bh>h*0.94){NORM[pid]=img.src;return;} // ya llena, no hace falta
+  const cx=(minx+maxx)/2,cy=(miny+maxy)/2;
+  let side=Math.max(bw,bh)*1.22;                        // joya + 22% de margen
+  const inv=1/sc; let ss=side*inv, sx=cx*inv-ss/2, sy=cy*inv-ss/2;
+  sx=Math.max(0,Math.min(sx,nw-1));sy=Math.max(0,Math.min(sy,nh-1));ss=Math.min(ss,nw-sx,nh-sy);
+  const OS=Math.min(700,Math.round(ss));const o=document.createElement('canvas');o.width=OS;o.height=OS;
+  const octx=o.getContext('2d');octx.fillStyle='#ffffff';octx.fillRect(0,0,OS,OS);
+  octx.drawImage(img,sx,sy,ss,ss,0,0,OS,OS);
+  const url=o.toDataURL('image/jpeg',0.9);NORM[pid]=url;img.src=url;
+}
+function normalizeProductImages(){
+  document.querySelectorAll('#prodGrid img[data-pid]').forEach(img=>{
+    const pid=img.dataset.pid;
+    if(NORM[pid]){if(img.src!==NORM[pid])img.src=NORM[pid];return;}
+    if(img.complete&&img.naturalWidth){normalizeOne(img);}
+    else img.addEventListener('load',()=>normalizeOne(img),{once:true});
+  });
+}
 function renderGrid(){
   const list=PRODUCTS.filter(p=>activeCat==='Todos'||p.categoria===activeCat);
   emptyMsg.hidden=list.length>0;
@@ -921,7 +958,7 @@ function renderGrid(){
     <div class="prod-card reveal ${'d'+((i%3)+1)} in${p.agotado?' is-out':''}">
       <div class="prod-media">
         ${badge}
-        ${imgSrc(p)?`<img src="${imgSrc(p)}" alt="${p.nombre}" loading="lazy" onerror="this.style.display='none';this.insertAdjacentHTML('afterend', ORNATA_FB(this))" data-fb='${encodeURIComponent(fallback(p))}'>`:fallback(p)}
+        ${imgSrc(p)?`<img src="${NORM[p.id]||imgSrc(p)}" data-pid="${p.id}" alt="${p.nombre}" loading="lazy" onerror="this.style.display='none';this.insertAdjacentHTML('afterend', ORNATA_FB(this))" data-fb='${encodeURIComponent(fallback(p))}'>`:fallback(p)}
       </div>
       <div class="prod-body">
         <p class="cat">${p.categoria}</p>
@@ -931,6 +968,7 @@ function renderGrid(){
       </div>
     </div>`;}).join('');
   grid.querySelectorAll('.prod-add[data-id]').forEach(b=>b.addEventListener('click',()=>{addToCart(b.dataset.id);b.classList.add('added');b.textContent='✓ Añadido';setTimeout(()=>{b.classList.remove('added');b.textContent='Añadir al carrito';},1200);}));
+  normalizeProductImages();
 }
 /* ---- colecciones dinámicas con imágenes ---- */
 const CAT_META={
