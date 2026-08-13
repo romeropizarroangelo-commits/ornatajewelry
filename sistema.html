@@ -430,7 +430,7 @@ const ICN = {
 
 /* ---------- Estado / persistencia ---------- */
 const DB_KEY = 'sgae_db_v1';
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const money = n => 'S/ ' + (Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2, maximumFractionDigits:2});
 const money2 = (n,mon) => (mon||'S/') + ' ' + (Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2, maximumFractionDigits:2});
 function tcActual(){
@@ -483,12 +483,12 @@ function seed() {
       { id: uid(), doc:'20609988776', nombre:'Repuestos del Pacífico S.A.C.', contacto:'Jorge Salas', tel:'016543210', email:'jsalas@reppacifico.pe', dir:'Ate, Lima' },
     ],
     ventas: [
-      { id: uid(), num:'F001-000124', fecha:'2026-07-18', clienteId:null, cliente:'Transportes El Rápido S.A.C.', items:3, subtotal:305.08, igv:54.92, total:360.00, estado:'Pagada', metodo:'Contado' },
-      { id: uid(), num:'F001-000123', fecha:'2026-07-17', clienteId:null, cliente:'Taller Mecánico Don José E.I.R.L.', items:5, subtotal:610.17, igv:109.83, total:720.00, estado:'Pendiente', metodo:'Crédito' },
-      { id: uid(), num:'B001-000512', fecha:'2026-07-16', clienteId:null, cliente:'Carlos Fernández Ríos', items:1, subtotal:15.25, igv:2.75, total:18.00, estado:'Pagada', metodo:'Contado', lineas:[] },
+      { id: uid(), num:'F001-000124', fecha:'2026-07-18', clienteId:null, cliente:'Transportes El Rápido S.A.C.', items:3, subtotal:305.08, igv:54.92, total:360.00, estado:'Pagada', metodo:'Contado', saldo:0, abonado:360.00 },
+      { id: uid(), num:'F001-000123', fecha:'2026-07-17', clienteId:null, cliente:'Taller Mecánico Don José E.I.R.L.', items:5, subtotal:610.17, igv:109.83, total:720.00, estado:'Pendiente', metodo:'Crédito', vcto:'2026-08-16', saldo:720.00, abonado:0 },
+      { id: uid(), num:'B001-000512', fecha:'2026-07-16', clienteId:null, cliente:'Carlos Fernández Ríos', items:1, subtotal:15.25, igv:2.75, total:18.00, estado:'Pagada', metodo:'Contado', lineas:[], saldo:0, abonado:18.00 },
     ],
     compras: [
-      { id: uid(), num:'F-2205', fecha:'2026-07-15', proveedor:'Importaciones Andinas S.A.', items:12, total:1840.00, estado:'Pendiente', metodo:'Crédito' },
+      { id: uid(), num:'F-2205', fecha:'2026-07-15', proveedor:'Importaciones Andinas S.A.', items:12, total:1840.00, estado:'Pendiente', metodo:'Crédito', vcto:'2026-08-14', saldo:1840.00, abonado:0 },
     ],
     cotizaciones: [],
     movimientos: [],
@@ -505,6 +505,8 @@ function seed() {
     percepciones: [],
     cierres: [],
     empresas: [],
+    cobranzas: [],
+    pagosprov: [],
     series: [
       { tipo:'FACTURA', serie:'F001', ultimo:124 },
       { tipo:'BOLETA', serie:'B001', ultimo:512 },
@@ -515,6 +517,8 @@ function seed() {
       { tipo:'RETENCION', serie:'R001', ultimo:0 },
       { tipo:'PERCEPCION', serie:'P001', ultimo:0 },
       { tipo:'COMPRA', serie:'F-', ultimo:2205 },
+      { tipo:'COBRANZA', serie:'RC01', ultimo:0 },
+      { tipo:'PAGO', serie:'EG01', ultimo:0 },
     ],
     usuarios: [
       { id:'u-admin', nombre:'Angelo', usuario:'admin', pin:'1234', rol:'admin', activo:true },
@@ -551,7 +555,7 @@ async function load(){
   const s = seed(); try { await idbSet('db',s); } catch(e){} return s;
 }
 function normalize(d) {
-  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','notasdebito','guias','caja','gastos','ordenescompra','importaciones','letras','retenciones','percepciones','cierres','empresas','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
+  ['productos','clientes','proveedores','ventas','compras','cotizaciones','movimientos','notascredito','notasdebito','guias','caja','gastos','ordenescompra','importaciones','letras','retenciones','percepciones','cierres','empresas','cobranzas','pagosprov','series','usuarios'].forEach(k => { if(!Array.isArray(d[k])) d[k]=[]; });
   const s = seed();
   if(!Array.isArray(d.tipocambio) || !d.tipocambio.length) d.tipocambio = s.tipocambio;
   d.cat = d.cat || {};
@@ -584,6 +588,19 @@ const MIGRATIONS = [
       ];
     }
   }},
+  // v4: cuentas corrientes con abono parcial. Inicializa saldo/abonado desde el estado
+  // actual de cada documento (Pagada → saldo 0; cualquier otro → saldo = total) y crea
+  // los arrays de recibos + sus correlativos. Idempotente (solo toca lo que falta).
+  { to:4, up:(d)=>{
+    const R=n=>Math.round((Number(n)||0)*100)/100;
+    const init=(arr)=>(arr||[]).forEach(x=>{ if(x.saldo==null){ const pag=x.estado==='Pagada'||x.estado==='Anulada'; x.abonado=pag&&x.estado==='Pagada'?R(x.total):0; x.saldo=pag?0:R(x.total); } });
+    init(d.ventas); init(d.compras);
+    if(!Array.isArray(d.cobranzas)) d.cobranzas=[];
+    if(!Array.isArray(d.pagosprov)) d.pagosprov=[];
+    d.series=Array.isArray(d.series)?d.series:[];
+    if(!d.series.find(s=>s.tipo==='COBRANZA')) d.series.push({tipo:'COBRANZA',serie:'RC01',ultimo:0});
+    if(!d.series.find(s=>s.tipo==='PAGO')) d.series.push({tipo:'PAGO',serie:'EG01',ultimo:0});
+  }},
 ];
 async function runMigrations(d){
   const from = Number(d.schemaVersion) || 1;
@@ -606,6 +623,8 @@ const SERIES = {
   RETENCION:    { serie:'R001', pad:6, sep:'-' },
   PERCEPCION:   { serie:'P001', pad:6, sep:'-' },
   COMPRA:       { serie:'F-',   pad:0, sep:''  },
+  COBRANZA:     { serie:'RC01', pad:6, sep:'-' },
+  PAGO:         { serie:'EG01', pad:6, sep:'-' },
 };
 function nextNumero(tipo){
   const cfg=SERIES[tipo]; if(!cfg) throw new Error('tipo de documento desconocido: '+tipo);
@@ -765,7 +784,7 @@ const VIEWS = {};
 VIEWS.dashboard = (el) => {
   const totalStock = DB.productos.reduce((s,p)=>s+Number(p.stock||0),0);
   const ventasHoy = DB.ventas.reduce((s,v)=>s+Number(v.total||0),0);
-  const porCobrar = DB.ventas.filter(v=>v.estado==='Pendiente').reduce((s,v)=>s+Number(v.total||0),0);
+  const porCobrar = totalPorCobrar();
   const bajoStock = DB.productos.filter(p=>Number(p.stock)<=Number(p.stockMin));
   const valorInv = DB.productos.reduce((s,p)=>s+Number(p.costo||0)*Number(p.stock||0),0);
 
@@ -1204,11 +1223,11 @@ VIEWS.ventas=(el)=>{
 function renderVentaLista(){
   const b=document.getElementById('ventaBody');
   const total=DB.ventas.reduce((s,v)=>s+Number(v.total||0),0);
-  const pend=DB.ventas.filter(v=>v.estado==='Pendiente').reduce((s,v)=>s+Number(v.total),0);
+  const pend=totalPorCobrar();
   b.innerHTML=`
     <div class="kpi-grid">
       ${kpiCard('money','var(--green)','var(--green-soft)','Total vendido',money(total),DB.ventas.length+' ventas',null)}
-      ${kpiCard('cobrar','var(--amber)','var(--amber-soft)','Por cobrar',money(pend),DB.ventas.filter(v=>v.estado==='Pendiente').length+' pendientes',null)}
+      ${kpiCard('cobrar','var(--amber)','var(--amber-soft)','Por cobrar',money(pend),DB.ventas.filter(esPendienteDoc).length+' pendientes',null)}
       ${kpiCard('check','var(--brand)','var(--brand-soft)','Pagadas',DB.ventas.filter(v=>v.estado==='Pagada').length,'documentos',null)}
     </div>
     <div class="card"><div class="section-title">Documentos</div><div class="table-wrap">
@@ -1350,7 +1369,7 @@ function validarStock(lines){
 }
 // Crédito del cliente: deuda pendiente + esta venta no debe superar su línea.
 function deudaCliente(clienteId){
-  const vv=DB.ventas.filter(v=>v.clienteId===clienteId && v.estado==='Pendiente').reduce((s,v)=>s+Number(v.total||0),0);
+  const vv=DB.ventas.filter(v=>v.clienteId===clienteId && esPendienteDoc(v)).reduce((s,v)=>s+docSaldo(v),0);
   const nd=(DB.notasdebito||[]).filter(n=>n.clienteId===clienteId && n.estado==='Pendiente').reduce((s,n)=>s+Number(n.total||0),0);
   return vv+nd;
 }
@@ -1382,7 +1401,7 @@ async function emitirVenta(){
     await commit(()=>{
       num = nextNumero(venta.tipo==='Boleta'?'BOLETA':'FACTURA');
       venta.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);deductStock(p,l.cant);recordMov(p,'VENTA',num,-l.cant);});
-      DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:venta.clienteId, cliente:cli?cli.nombre:'Cliente varios', items:venta.lines.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:venta.metodo==='Crédito'?'Pendiente':'Pagada', metodo:venta.metodo, tc:venta.tc, referencia:venta.fromCotiz||'', usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
+      DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:venta.clienteId, cliente:cli?cli.nombre:'Cliente varios', items:venta.lines.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:venta.metodo==='Crédito'?'Pendiente':'Pagada', saldo:(venta.metodo==='Crédito'?total:0), abonado:(venta.metodo==='Crédito'?0:total), metodo:venta.metodo, tc:venta.tc, referencia:venta.fromCotiz||'', usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
     });
   } catch(e){
     emitLock=false; if(btn) btn.disabled=false;
@@ -1425,19 +1444,229 @@ function estadoStockBadge(p){const e=prodEstado(p);if(e==='agotado')return '<spa
 
 /* ---------- COMPRAS (placeholder funcional) ---------- */
 VIEWS.compras=(el)=>{ placeholderView(el,'Compras','Registra facturas de compra y aumenta tu stock automáticamente.','compras',['Registro de facturas de compra','Ingreso automático a inventario','Cuentas por pagar a proveedores']); };
-VIEWS.cobrar=(el)=>{
-  const pend=DB.ventas.filter(v=>v.estado==='Pendiente');
-  const total=pend.reduce((s,v)=>s+Number(v.total),0);
-  el.innerHTML=`
-    <div class="page-head"><div><h1>Cuentas por Cobrar</h1><p>Ventas a crédito pendientes de pago</p></div></div>
-    <div class="kpi-grid">${kpiCard('cobrar','var(--amber)','var(--amber-soft)','Total por cobrar',money(total),pend.length+' documentos',null)}</div>
-    <div class="card"><div class="section-title">Documentos pendientes</div><div class="table-wrap">
-    <table><thead><tr><th>Documento</th><th>Cliente</th><th>Fecha</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>
-    ${pend.map(v=>`<tr><td class="cell-mono cell-strong">${v.num}</td><td class="cell-strong">${v.cliente}</td><td>${fmtDate(v.fecha)}</td><td style="text-align:right" class="cell-strong">${money(v.total)}</td>
-      <td><div class="row-actions"><button class="btn btn-primary btn-sm" data-pay="${v.id}">${ICN.check} Registrar cobro</button></div></td></tr>`).join('')||`<tr><td colspan="5" class="empty" style="padding:40px">✅ No hay cuentas por cobrar</td></tr>`}
-    </tbody></table></div></div>`;
-  el.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{DB.ventas.find(v=>v.id===b.dataset.pay).estado='Pagada';save();go('cobrar');toast('Cobro registrado','success');});
+/* ================== CUENTAS CORRIENTES — Cobranzas / Pagos ==================
+   Registro real de cobros/pagos: abono parcial (a cuenta) por documento, saldo nuevo en
+   vivo, medio de pago + banco/cuenta/caja/cobrador, y recibo con historial e impresión.
+   CxC y CxP son ESPEJO → un solo motor. El cálculo de dinero está aislado y testeado. */
+const R2 = n => Math.round((Number(n)||0)*100)/100;
+function docSaldo(d){
+  if(!d) return 0;
+  if(d.estado==='Anulada') return 0;
+  if(d.saldo!=null) return Math.max(0, Number(d.saldo)||0);
+  return d.estado==='Pagada' ? 0 : (Number(d.total)||0);   // defensivo con docs previos a la migración v4
+}
+function esPendienteDoc(d){ return d && d.estado!=='Anulada' && docSaldo(d) > 0.005; }
+function estadoPorSaldo(d){ const s=docSaldo(d), t=Number(d.total)||0; return s<=0.005 ? 'Pagada' : (s < t-0.005 ? 'Parcial' : 'Pendiente'); }
+/* Aplica abonos a un conjunto de documentos. PURO y testeable.
+   aplic = [{docId, abono}] → muta cada doc (saldo, abonado, estado). Devuelve {aplicado, errores}. */
+function aplicarAbonos(docs, aplic){
+  let aplicado=0; const errores=[];
+  (aplic||[]).forEach(a=>{
+    const abono=R2(a.abono); if(abono<=0) return;
+    const d=(docs||[]).find(x=>x.id===a.docId);
+    if(!d){ errores.push('Documento no encontrado'); return; }
+    const saldo=docSaldo(d);
+    if(abono - saldo > 0.005){ errores.push('El abono de '+abono+' supera el saldo de '+saldo+(d.num?' ('+d.num+')':'')); return; }
+    d.abonado=R2((Number(d.abonado)||0)+abono);
+    d.saldo=R2(saldo-abono);
+    d.estado=estadoPorSaldo(d);
+    aplicado=R2(aplicado+abono);
+  });
+  return { aplicado:R2(aplicado), errores };
+}
+/* Revierte los abonos de un recibo (al anularlo): devuelve el saldo a cada documento. */
+function revertirAbonos(docs, aplicaciones){
+  (aplicaciones||[]).forEach(a=>{
+    const d=(docs||[]).find(x=>x.id===a.docId); if(!d) return;
+    const prev=docSaldo(d);
+    d.abonado=Math.max(0, R2((Number(d.abonado)||0)-Number(a.abono||0)));
+    d.saldo=R2(prev+Number(a.abono||0));
+    if(d.estado!=='Anulada') d.estado=estadoPorSaldo(d);
+  });
+}
+function totalPorCobrar(){ return R2(DB.ventas.reduce((s,v)=>s+docSaldo(v),0)); }
+function totalPorPagar(){ return R2(DB.compras.reduce((s,c)=>s+docSaldo(c),0)); }
+
+const CCFG = {
+  cobrar: { tipo:'COBRANZA', serie:'COBRANZA', arr:()=>DB.cobranzas, docs:()=>DB.ventas, ents:()=>DB.clientes,
+            title:'Cuentas por Cobrar', sub:'Cobra las facturas del cliente aplicando abonos a cuenta', view:'cobrar',
+            entLabel:'Cliente', entKey:'cliente', accion:'cobro', Accion:'Cobro', verbo:'cobrar', persona:'Cobrador', color:'var(--green)', soft:'var(--green-soft)' },
+  pagos:  { tipo:'PAGO', serie:'PAGO', arr:()=>DB.pagosprov, docs:()=>DB.compras, ents:()=>DB.proveedores,
+            title:'Cuentas por Pagar', sub:'Paga las facturas del proveedor aplicando abonos a cuenta', view:'pagos',
+            entLabel:'Proveedor', entKey:'proveedor', accion:'pago', Accion:'Pago', verbo:'pagar', persona:null, color:'var(--red)', soft:'var(--red-soft)' },
 };
+const CC = { cobrar:{tab:'reg', ent:'', estado:'deuda', abonos:{}}, pagos:{tab:'reg', ent:'', estado:'deuda', abonos:{}} };
+
+function renderCuentas(el, key){
+  const cfg=CCFG[key], st=CC[key];
+  el.innerHTML=`<div class="page-head"><div><h1>${cfg.title}</h1><p>${cfg.sub}</p></div></div>
+    <div class="segmented" id="ccTabs" style="margin-bottom:18px">
+      <button data-t="reg" class="${st.tab==='reg'?'active':''}">Registrar ${cfg.accion}</button>
+      <button data-t="con" class="${st.tab==='con'?'active':''}">Historial de ${cfg.accion}s</button>
+    </div><div id="ccBody"></div>`;
+  el.querySelectorAll('#ccTabs button').forEach(b=>b.onclick=()=>{ st.tab=b.dataset.t; renderCuentas(el,key); });
+  if(st.tab==='reg') ccRenderReg(key); else ccRenderCon(key);
+}
+function ccFiltradas(key){
+  const cfg=CCFG[key], st=CC[key];
+  let list=cfg.docs().filter(d=>d.estado!=='Anulada');
+  if(st.estado!=='todos') list=list.filter(esPendienteDoc);
+  if(st.ent) list=list.filter(d=>d[cfg.entKey]===st.ent);
+  return list.sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+}
+function ccRenderReg(key){
+  const cfg=CCFG[key], st=CC[key];
+  const body=document.getElementById('ccBody'); if(!body) return;
+  const ents=cfg.ents();
+  const pend=cfg.docs().filter(esPendienteDoc);
+  const total=key==='cobrar'?totalPorCobrar():totalPorPagar();
+  body.innerHTML=`
+    <div class="kpi-grid" style="margin-bottom:18px">${kpiCard('cobrar',cfg.color,cfg.soft,'Total por '+cfg.verbo,money(total),pend.length+' documentos con saldo',null)}</div>
+    <div class="card" style="margin-bottom:18px"><div style="padding:16px;border-bottom:1px solid var(--line);display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:260px"><label>${cfg.entLabel}</label>
+        <select id="ccEnt"><option value="">— Todos con deuda —</option>${ents.map(e=>`<option value="${(e.nombre||'').replace(/"/g,'&quot;')}" ${st.ent===e.nombre?'selected':''}>${e.nombre}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;min-width:170px"><label>Mostrar</label>
+        <select id="ccEstado"><option value="deuda" ${st.estado==='deuda'?'selected':''}>Solo con saldo</option><option value="todos" ${st.estado==='todos'?'selected':''}>Todos los documentos</option></select></div>
+    </div>
+    <div class="table-wrap" id="ccDocs"></div></div>
+    <div class="grid-2">
+      <div class="card"><div class="section-title">Datos del ${cfg.accion}</div><div class="form-grid" style="padding:16px">
+        <div class="field"><label>Fecha</label><input type="date" id="cc_fecha" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div class="field"><label>Medio de pago</label><select id="cc_medio"><option>Efectivo</option><option>Depósito</option><option>Transferencia</option><option>Cheque</option><option>Tarjeta</option><option>Yape / Plin</option></select></div>
+        <div class="field"><label>Banco</label><input id="cc_banco" placeholder="BCP, BBVA…"></div>
+        <div class="field"><label>N° operación / voucher</label><input id="cc_cuenta" placeholder="N° op."></div>
+        ${cfg.persona?`<div class="field"><label>${cfg.persona}</label><input id="cc_persona" value="${usuarioActual()}"></div>`:`<div class="field"><label>Fecha diferida (cheque)</label><input type="date" id="cc_persona"></div>`}
+        <div class="field"><label>Caja</label><input id="cc_caja" value="CAJA 1"></div>
+        <div class="field"><label>Moneda</label><select id="cc_moneda"><option>S/</option><option>US$</option></select></div>
+        <div class="field"><label>Tipo de cambio</label><input type="number" step="0.001" id="cc_tc" value="${tcActual()}"></div>
+        <div class="field full"><label>Observación</label><input id="cc_obs" placeholder="Opcional"></div>
+      </div></div>
+      <div class="card" style="display:flex;flex-direction:column">
+        <div class="section-title">Resumen del ${cfg.accion}</div>
+        <div style="padding:24px 20px;flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px">
+          <div style="color:var(--ink-2);font-size:13px">Total a ${cfg.verbo}</div>
+          <div id="ccTotal" style="font-size:34px;font-weight:800;color:${cfg.color}">${money(0)}</div>
+          <div id="ccCount" style="color:var(--ink-3);font-size:12.5px">0 documentos seleccionados</div>
+        </div>
+        <div style="padding:16px;border-top:1px solid var(--line)"><button class="btn btn-primary" id="ccGrabar" style="width:100%">${ICN.check} Registrar ${cfg.accion}</button></div>
+      </div>
+    </div>`;
+  document.getElementById('ccEnt').onchange=e=>{ st.ent=e.target.value; st.abonos={}; ccRenderReg(key); };
+  document.getElementById('ccEstado').onchange=e=>{ st.estado=e.target.value; ccRenderReg(key); };
+  document.getElementById('ccGrabar').onclick=()=>ccGrabar(key);
+  ccRenderDocs(key);
+}
+function ccRenderDocs(key){
+  const cfg=CCFG[key], st=CC[key];
+  const wrap=document.getElementById('ccDocs'); if(!wrap) return;
+  const list=ccFiltradas(key);
+  wrap.innerHTML=`<table><thead><tr><th>${cfg.entLabel}</th><th>Documento</th><th>Emisión</th><th>Vcto</th><th style="text-align:right">Total</th><th style="text-align:right">Saldo</th><th style="text-align:right">A cuenta</th><th style="text-align:right">Saldo nuevo</th><th></th></tr></thead><tbody>
+    ${list.map(d=>{ const s=docSaldo(d), ab=Number(st.abonos[d.id])||0, mon=d.moneda||'S/';
+      return `<tr>
+        <td>${d[cfg.entKey]||'—'}</td>
+        <td class="cell-mono cell-strong">${d.num}</td>
+        <td>${fmtDate(d.fecha)}</td>
+        <td>${fmtDate(d.vcto)}</td>
+        <td style="text-align:right">${money2(d.total,mon)}</td>
+        <td style="text-align:right" class="cell-strong">${money2(s,mon)}</td>
+        <td style="text-align:right"><input class="cc-abono" data-id="${d.id}" data-saldo="${s}" data-mon="${mon}" type="number" min="0" step="0.01" value="${ab>0?ab:''}" placeholder="0.00" style="width:112px;text-align:right"></td>
+        <td style="text-align:right" id="sn-${d.id}" class="cell-mono">${money2(s-ab,mon)}</td>
+        <td><button class="btn btn-ghost btn-sm" data-full="${d.id}">Todo</button></td>
+      </tr>`; }).join('')||emptyRow(9)}
+  </tbody></table>`;
+  wrap.querySelectorAll('.cc-abono').forEach(inp=>{
+    inp.oninput=()=>{ let v=Number(inp.value)||0; const s=Number(inp.dataset.saldo)||0; const mon=inp.dataset.mon||'S/';
+      if(v<0)v=0; if(v>s){ v=s; inp.value=R2(s); } st.abonos[inp.dataset.id]=v;
+      const sn=document.getElementById('sn-'+inp.dataset.id); if(sn) sn.textContent=money2(s-v,mon); ccTotalRefresh(key); };
+  });
+  wrap.querySelectorAll('[data-full]').forEach(b=>b.onclick=()=>{ const inp=wrap.querySelector('.cc-abono[data-id="'+b.dataset.full+'"]'); if(inp){ inp.value=inp.dataset.saldo; inp.oninput(); } });
+  ccTotalRefresh(key);
+}
+function ccTotalRefresh(key){
+  const st=CC[key]; let total=0, n=0;
+  Object.values(st.abonos).forEach(v=>{ v=Number(v)||0; if(v>0){ total+=v; n++; } });
+  const t=document.getElementById('ccTotal'); if(t) t.textContent=money(R2(total));
+  const c=document.getElementById('ccCount'); if(c) c.textContent=n+' documento'+(n===1?'':'s')+' seleccionado'+(n===1?'':'s');
+}
+function ccGrabar(key){
+  const cfg=CCFG[key], st=CC[key];
+  const aplic=Object.entries(st.abonos).map(([docId,abono])=>({docId,abono:Number(abono)||0})).filter(a=>a.abono>0);
+  if(!aplic.length){ toast('Ingresa al menos un abono a cuenta','error'); return; }
+  const meta={ fecha:val('cc_fecha')||new Date().toISOString().slice(0,10), medio:val('cc_medio')||'Efectivo', banco:val('cc_banco'), cuenta:val('cc_cuenta'),
+    persona:(document.getElementById('cc_persona')||{}).value||'', caja:val('cc_caja'), moneda:val('cc_moneda')||'S/', tc:Number(val('cc_tc'))||tcActual(), obs:val('cc_obs') };
+  const ent = st.ent || (()=>{ const d=cfg.docs().find(x=>x.id===aplic[0].docId); return d?d[cfg.entKey]:''; })();
+  const btn=document.getElementById('ccGrabar'); if(btn) btn.disabled=true;
+  commit(()=>{
+    const res=aplicarAbonos(cfg.docs(), aplic);
+    if(res.errores.length) throw new Error(res.errores[0]);
+    const detalle=aplic.map(a=>{ const d=cfg.docs().find(x=>x.id===a.docId); return { docId:a.docId, num:d?d.num:'', abono:R2(a.abono) }; });
+    const rec={ id:uid(), num:nextNumero(cfg.serie), tipo:cfg.tipo, fecha:meta.fecha, entidad:ent,
+      medio:meta.medio, banco:meta.banco, cuenta:meta.cuenta, persona:meta.persona, caja:meta.caja,
+      moneda:meta.moneda, tc:meta.tc, total:res.aplicado, obs:meta.obs, estado:'Registrado',
+      usuario:usuarioActual(), creado:new Date().toISOString(), aplicaciones:detalle };
+    cfg.arr().push(rec); st._ultimo=rec;
+  }).then(()=>{
+    const rec=st._ultimo; st._ultimo=null; st.abonos={};
+    toast(cfg.Accion+' '+(rec?rec.num:'')+' registrado','success');
+    if(rec) ccPrintRecibo(rec, key);
+    go(cfg.view);
+  }).catch(e=>{ if(btn) btn.disabled=false; toast('No se pudo registrar: '+(e.message||''),'error'); });
+}
+function ccRenderCon(key){
+  const cfg=CCFG[key];
+  const body=document.getElementById('ccBody'); if(!body) return;
+  const recibos=[...cfg.arr()].reverse();
+  const totReg=R2(recibos.filter(r=>r.estado!=='Anulado').reduce((s,r)=>s+Number(r.total||0),0));
+  body.innerHTML=`<div class="kpi-grid" style="margin-bottom:18px">${kpiCard('cobrar',cfg.color,cfg.soft,'Total '+cfg.accion+'s (vigentes)',money(totReg),recibos.filter(r=>r.estado!=='Anulado').length+' recibos',null)}</div>
+    <div class="card"><div class="section-title">Historial de ${cfg.accion}s</div><div class="table-wrap">
+    <table><thead><tr><th>Recibo</th><th>Fecha</th><th>${cfg.entLabel}</th><th>Medio</th><th style="text-align:center">Docs</th><th style="text-align:right">Total</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${recibos.map(r=>`<tr>
+      <td class="cell-mono cell-strong">${r.num}</td><td>${fmtDate(r.fecha)}</td><td>${r.entidad||'—'}</td><td>${r.medio||'—'}</td>
+      <td style="text-align:center">${(r.aplicaciones||[]).length}</td>
+      <td style="text-align:right" class="cell-strong">${money2(r.total,r.moneda)}</td>
+      <td>${r.estado==='Anulado'?'<span class="badge badge-red">Anulado</span>':'<span class="badge badge-green">Registrado</span>'}</td>
+      <td><div class="row-actions"><button class="icon-btn" data-print="${r.id}" title="Imprimir">${ICN.print}</button>${r.estado!=='Anulado'?`<button class="icon-btn del" data-anular="${r.id}" title="Anular">${ICN.del}</button>`:''}</div></td>
+    </tr>`).join('')||emptyRow(8)}
+    </tbody></table></div></div>`;
+  body.querySelectorAll('[data-print]').forEach(b=>b.onclick=()=>{ const r=cfg.arr().find(x=>x.id===b.dataset.print); if(r) ccPrintRecibo(r,key); });
+  body.querySelectorAll('[data-anular]').forEach(b=>b.onclick=()=>{ const r=cfg.arr().find(x=>x.id===b.dataset.anular);
+    confirmDialog('¿Anular recibo '+r.num+'?','Se devolverá el saldo a los documentos abonados. El recibo queda como Anulado (no se borra).',()=>{
+      commit(()=>{ revertirAbonos(cfg.docs(), r.aplicaciones); const rr=cfg.arr().find(x=>x.id===r.id); rr.estado='Anulado'; rr.anuladoPor=usuarioActual(); })
+        .then(()=>{ toast('Recibo anulado','success'); go(cfg.view); })
+        .catch(()=>toast('No se pudo anular','error'));
+    });
+  });
+}
+function ccPrintRecibo(rec, key){
+  const cfg=CCFG[key];
+  const w=window.open('','_blank','width=760,height=900'); if(!w){ toast('Permite las ventanas emergentes para imprimir','error'); return; }
+  const filas=(rec.aplicaciones||[]).map(a=>`<tr><td>${a.num||''}</td><td class="r">${money2(a.abono,rec.moneda)}</td></tr>`).join('');
+  w.document.write(`<html><head><title>${cfg.Accion} ${rec.num}</title><meta charset="utf-8"><style>
+    body{font-family:Arial;font-size:12px;padding:28px;color:#111}h1{color:#e01f26;font-size:17px;margin:0}
+    .box{border:1px solid #ccc;border-radius:8px;padding:14px;margin-top:14px}
+    .row{display:flex;justify-content:space-between;margin:3px 0}.k{color:#666}
+    table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#111;color:#fff;padding:6px;text-align:left;font-size:11px}
+    td{padding:6px;border-bottom:1px solid #eee}td.r,th.r{text-align:right}
+    .tot{font-size:20px;font-weight:800;text-align:right;margin-top:12px;color:#111}
+    @media print{body{padding:0}}</style></head><body>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><h1>${COMPANY.nombre}</h1><div style="color:#666">RUC ${COMPANY.ruc}</div></div>
+      <div style="text-align:right"><div style="font-weight:800;font-size:15px">${cfg.tipo==='COBRANZA'?'RECIBO DE COBRANZA':'COMPROBANTE DE PAGO'}</div><div class="cell-mono" style="font-size:15px;color:#e01f26">${rec.num}</div></div>
+    </div>
+    <div class="box">
+      <div class="row"><span class="k">${cfg.entLabel}:</span><b>${rec.entidad||'—'}</b></div>
+      <div class="row"><span class="k">Fecha:</span><span>${fmtDate(rec.fecha)}</span></div>
+      <div class="row"><span class="k">Medio de pago:</span><span>${rec.medio||'—'}${rec.banco?(' · '+rec.banco):''}${rec.cuenta?(' · '+rec.cuenta):''}</span></div>
+      ${rec.persona?`<div class="row"><span class="k">${cfg.persona||'Referencia'}:</span><span>${rec.persona}</span></div>`:''}
+      <div class="row"><span class="k">Caja / Usuario:</span><span>${rec.caja||''} · ${rec.usuario||''}</span></div>
+      ${rec.obs?`<div class="row"><span class="k">Observación:</span><span>${rec.obs}</span></div>`:''}
+    </div>
+    <table><thead><tr><th>Documento</th><th class="r">Abono aplicado</th></tr></thead><tbody>${filas}</tbody></table>
+    <div class="tot">TOTAL ${cfg.tipo==='COBRANZA'?'COBRADO':'PAGADO'}: ${money2(rec.total,rec.moneda)}</div>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
+VIEWS.cobrar=(el)=>renderCuentas(el,'cobrar');
 VIEWS.reportes=(el)=>{
   const porMarca={};DB.productos.forEach(p=>{porMarca[p.marca||'Otros']=(porMarca[p.marca||'Otros']||0)+Number(p.costo)*Number(p.stock);});
   const maxV=Math.max(1,...Object.values(porMarca));
@@ -1456,7 +1685,7 @@ VIEWS.reportes=(el)=>{
         ${statRow('Ticket promedio',money(DB.ventas.length?totalVent/DB.ventas.length:0))}
         ${statRow('Productos en catálogo',DB.productos.length)}
         ${statRow('Clientes activos',DB.clientes.length)}
-        ${statRow('Por cobrar',money(DB.ventas.filter(v=>v.estado==='Pendiente').reduce((s,v)=>s+Number(v.total),0)))}
+        ${statRow('Por cobrar',money(totalPorCobrar()))}
       </div></div>
     </div>`;
 };
@@ -1539,10 +1768,10 @@ VIEWS.facturacompra=(el)=>{
 function renderCompraLista(){
   const b=document.getElementById('compraBody');
   const total=DB.compras.reduce((s,c)=>s+Number(c.total||0),0);
-  const pend=DB.compras.filter(c=>c.estado==='Pendiente').reduce((s,c)=>s+Number(c.total),0);
+  const pend=totalPorPagar();
   b.innerHTML=`<div class="kpi-grid">
     ${kpiCard('compras','var(--brand)','var(--brand-soft)','Total comprado',money(total),DB.compras.length+' facturas',null)}
-    ${kpiCard('cobrar','var(--amber)','var(--amber-soft)','Por pagar',money(pend),DB.compras.filter(c=>c.estado==='Pendiente').length+' pendientes',null)}
+    ${kpiCard('cobrar','var(--amber)','var(--amber-soft)','Por pagar',money(pend),DB.compras.filter(esPendienteDoc).length+' pendientes',null)}
     </div>
     <div class="card"><div class="section-title">Facturas de compra</div><div class="table-wrap">
     <table><thead><tr><th>Factura</th><th>Proveedor</th><th>Fecha</th><th style="text-align:center">Ítems</th><th>Estado</th><th style="text-align:right">Total</th></tr></thead><tbody>
@@ -1595,7 +1824,7 @@ async function emitirCompra(){
         // Costo promedio ponderado. Si aún no había costo, se establece con esta compra.
         p.costo = (costoPrev>0 && stockPrev>0) ? (stockPrev*costoPrev + l.cant*Number(l.costo)) / (stockPrev+l.cant) : Number(l.costo)||0;
         recordMov(p,'COMPRA',num,l.cant);});
-      DB.compras.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:compra.proveedor,items:compra.lines.reduce((s,l)=>s+l.cant,0),total,estado:compra.metodo==='Crédito'?'Pendiente':'Pagada',metodo:compra.metodo,usuario:usuarioActual(),creado:new Date().toISOString()});
+      DB.compras.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:compra.proveedor,items:compra.lines.reduce((s,l)=>s+l.cant,0),total,estado:compra.metodo==='Crédito'?'Pendiente':'Pagada',saldo:(compra.metodo==='Crédito'?total:0),abonado:(compra.metodo==='Crédito'?0:total),metodo:compra.metodo,usuario:usuarioActual(),creado:new Date().toISOString()});
     });
   } catch(e){ emitLock=false; if(btn) btn.disabled=false; toast('No se pudo guardar la compra. Reintenta.','error'); return; }
   renderNav();
@@ -1604,19 +1833,8 @@ async function emitirCompra(){
   document.querySelector('#segC button[data-t="lista"]').click();
 }
 
-/* ---------- CUENTAS POR PAGAR: Pagos ---------- */
-VIEWS.pagos=(el)=>{
-  const pend=DB.compras.filter(c=>c.estado==='Pendiente');
-  const total=pend.reduce((s,c)=>s+Number(c.total),0);
-  el.innerHTML=`<div class="page-head"><div><h1>Pagos a Proveedores</h1><p>Facturas de compra pendientes de pago</p></div></div>
-    <div class="kpi-grid">${kpiCard('cobrar','var(--amber)','var(--amber-soft)','Total por pagar',money(total),pend.length+' facturas',null)}</div>
-    <div class="card"><div class="section-title">Facturas pendientes</div><div class="table-wrap">
-    <table><thead><tr><th>Factura</th><th>Proveedor</th><th>Fecha</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>
-    ${pend.map(c=>`<tr><td class="cell-mono cell-strong">${c.num}</td><td class="cell-strong">${c.proveedor}</td><td>${fmtDate(c.fecha)}</td><td style="text-align:right" class="cell-strong">${money(c.total)}</td>
-      <td><div class="row-actions"><button class="btn btn-primary btn-sm" data-pay="${c.id}">${ICN.check} Registrar pago</button></div></td></tr>`).join('')||`<tr><td colspan="5" class="empty" style="padding:40px">✅ No hay pagos pendientes</td></tr>`}
-    </tbody></table></div></div>`;
-  el.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{DB.compras.find(c=>c.id===b.dataset.pay).estado='Pagada';save();go('pagos');toast('Pago registrado','success');});
-};
+/* ---------- CUENTAS POR PAGAR (espejo de CxC, mismo motor de abonos) ---------- */
+VIEWS.pagos=(el)=>renderCuentas(el,'pagos');
 
 /* ================== DOCUMENTOS (Cotización / Factura / Boleta) ================== */
 /* >>> DATOS DE TU EMPRESA (valores por defecto; se editan desde Configuración) <<< */
@@ -1941,7 +2159,7 @@ function cotizAFactura(id){
         num = nextNumero('FACTURA');
         conProd.forEach(l=>{ const p=DB.productos.find(x=>x.id===l.prodId); if(reservada) p.reservado=Math.max(0,(Number(p.reservado)||0)-l.cant); deductStock(p,l.cant); recordMov(p,'VENTA',num,-l.cant); });
         const cc=DB.cotizaciones.find(x=>x.id===c.id); if(cc) cc.estado='Facturada';
-        DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:c.clienteId, cliente:c.cliente, items:lineas.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:'Pagada', metodo:'Contado', tc, referencia:c.num, usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
+        DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:c.clienteId, cliente:c.cliente, items:lineas.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:'Pagada', saldo:0, abonado:total, metodo:'Contado', tc, referencia:c.num, usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
       });
     } catch(e){ emitLock=false; toast('No se pudo guardar. No se descontó stock. Reintenta.','error'); return; }
     renderNav();
@@ -2633,7 +2851,7 @@ function recibirOC(id){
       await commit(()=>{
         (o.lineas||[]).forEach(l=>{ if(l.prodId){ const p=DB.productos.find(x=>x.id===l.prodId); if(p){ const stockPrev=Number(p.stock)||0,costoPrev=Number(p.costo)||0; addStock(p,l.cant); p.costo=(costoPrev>0&&stockPrev>0)?(stockPrev*costoPrev+l.cant*Number(l.costo))/(stockPrev+l.cant):Number(l.costo)||0; recordMov(p,'COMPRA',o.num,l.cant); } } });
         const oo=DB.ordenescompra.find(x=>x.id===id); if(oo) oo.estado='Recibida';
-        DB.compras.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:o.proveedor,items:o.items,total:o.total,estado:'Pendiente',metodo:'Crédito',usuario:usuarioActual(),creado:new Date().toISOString(),ocNum:o.num});
+        DB.compras.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:o.proveedor,items:o.items,total:o.total,estado:'Pendiente',saldo:o.total,abonado:0,metodo:'Crédito',usuario:usuarioActual(),creado:new Date().toISOString(),ocNum:o.num});
       });
     }catch(e){toast('No se pudo recibir la orden','error');return;}
     toast('Orden '+o.num+' recibida · stock ingresado','success'); renderOCLista(); renderNav();

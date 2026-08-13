@@ -340,6 +340,25 @@ Con SCHEMA_VERSION al día (`cierres:[]`, `empresas:[]` en seed + normalize) y m
 
 ---
 
+## CUENTAS CORRIENTES — Cobranzas / Pagos reales (2026-08-12)  [SCHEMA_VERSION 3→4]
+
+> Origen: el usuario mostró capturas de su SGAE (Letras de Compra, CxP, CxC, Nota de Crédito, Registro de Compras, Kardex) — "algo así es y tiene que ser mucho mejor y profesional y potente". Mis CxC/CxP eran triviales (marcaban el documento entero como Pagado). Reconstruidas como **registros de cobranza/pago de verdad**, espejo entre sí (un solo motor).
+
+- ✅ **Modelo v4:** cada venta/compra tiene `saldo` + `abonado`. **Migración v4** inicializa desde el estado actual (Pagada→saldo 0; resto→saldo=total), crea `cobranzas[]`/`pagosprov[]` y los correlativos **RC01** (recibo de cobranza) / **EG01** (egreso/pago), con backup-antes-de-migrar. Verificada idempotente sobre BD v3 simulada. Documentos nuevos (venta, compra, cotización→factura, recepción de OC) nacen con saldo/abonado.
+- ✅ **Motor de abonos** (puro, aislado, testeado): `docSaldo` (defensivo con docs pre-v4), `aplicarAbonos` (abono parcial *a cuenta* con **tope: no se puede pagar más que el saldo**), `revertirAbonos` (al anular un recibo devuelve el saldo), `estadoPorSaldo` (Pagada/Parcial/Pendiente).
+- ✅ **CxC / CxP (VIEWS.cobrar / VIEWS.pagos = `renderCuentas`):** pestañas **Registrar / Historial**. Registro: filtro por cliente/proveedor + estado, tabla de documentos con **A cuenta** (input) y **Saldo nuevo en vivo**, botón "Todo" por fila; panel de pago con **medio de pago, banco, N° operación, cobrador (CxC) / fecha diferida de cheque (CxP), caja, moneda, TC, observación**; total a cobrar/pagar en vivo. **GRABAR** aplica los abonos atómicamente (`commit`), genera **recibo** (RC01/EG01) e imprime. Historial: lista de recibos con **Imprimir** y **Anular** (reversa el saldo, no borra).
+- ✅ **KPIs por saldo real:** dashboard, Ventas, Compras, Reportes y el control de crédito (`deudaCliente`) ahora usan `docSaldo` → el "por cobrar/pagar" **baja con cada abono parcial** (antes mostraba el total aunque estuviera parcialmente pagado).
+
+**Verificación:** `tests/cobranzas.test.js` — 13/13 (abono parcial deja saldo exacto; segundo abono cierra; **rechaza pagar de más**; un recibo a varios docs; anular devuelve saldo; docSaldo defensivo). **Suite total: 130/130.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+**Siguiente (según capturas del usuario, en orden):** Letras de **Compra** (proveedor → adjuntar facturas → generar letras con vencimientos; hoy Letras es un canje genérico); **Kardex** con saldo corrido (Inicial/Ingreso/Salida/Final + almacén/TC/costo por movimiento); **Registro de Compras** con período tributario, guía, distrito y atajos F1–F6.
+
+---
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.
