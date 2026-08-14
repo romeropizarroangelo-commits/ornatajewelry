@@ -719,6 +719,7 @@ const MENU = [
     { id:'repmargen', label:'Rentabilidad / Margen', adminOnly:true },
     { id:'repventasnetas', label:'Ventas Netas' },
     { id:'repranking', label:'Ranking de Ventas' },
+    { id:'repcategorias', label:'Ventas por Línea / Marca' },
     { id:'repvendedor', label:'Ventas por Vendedor' },
     { id:'repcobranzas', label:'Reporte de Cobranzas' },
     { id:'estadocuenta', label:'Estado de Cuenta' },
@@ -3044,6 +3045,59 @@ VIEWS.repranking=(el)=>{
     <div class="card"><div class="section-title">Detalle Top 20</div><div class="table-wrap"><table><thead><tr><th>#</th><th>Producto</th><th>Código</th><th style="text-align:center">Unid.</th><th style="text-align:right">Importe</th></tr></thead><tbody>
     ${top.map((p,i)=>`<tr><td class="cell-mono">${i+1}</td><td class="cell-strong">${p.desc}</td><td class="cell-mono">${p.codigo||''}</td><td style="text-align:center">${p.cant}</td><td style="text-align:right" class="cell-strong">${money(p.importe)}</td></tr>`).join('')}
     </tbody></table></div></div>`:emptyState('Sin ventas aún','Registra ventas para ver el ranking.')}`;
+};
+/* Ventas agrupadas por categoría (línea o marca), con rango de fechas. PURO/testeable.
+   Resuelve la categoría de cada línea buscando el producto por id o por código. */
+function ventasPorCategoria(ventas, productos, dim, desde, hasta){
+  const pById={}, pByCod={};
+  (productos||[]).forEach(p=>{ pById[p.id]=p; if(p.codigo) pByCod[p.codigo]=p; });
+  const label='(sin '+(dim==='marca'?'marca':'línea')+')';
+  const agg={};
+  (ventas||[]).forEach(v=>{
+    if(v.estado==='Anulada') return;
+    if(desde && String(v.fecha||'')<desde) return;
+    if(hasta && String(v.fecha||'')>hasta) return;
+    (v.lineas||[]).forEach(l=>{
+      const p=pById[l.prodId]||pByCod[l.codigo];
+      const cat=(p&&(dim==='marca'?p.marca:p.linea))||label;
+      if(!agg[cat]) agg[cat]={cat, cant:0, importe:0};
+      agg[cat].cant+=Number(l.cant||0);
+      agg[cat].importe+=Number(l.precio!=null?l.precio:l.valor||0)*Number(l.cant||0);
+    });
+  });
+  return Object.values(agg).map(x=>({cat:x.cat, cant:x.cant, importe:R2(x.importe)})).sort((a,b)=>b.importe-a.importe);
+}
+let rcatDim='linea', rcatDesde='', rcatHasta='';
+VIEWS.repcategorias=(el)=>{
+  const list=ventasPorCategoria(DB.ventas, DB.productos, rcatDim, rcatDesde, rcatHasta);
+  const totalImp=R2(list.reduce((s,x)=>s+x.importe,0)), totalU=list.reduce((s,x)=>s+x.cant,0);
+  const dimLabel=rcatDim==='marca'?'Marca':'Línea';
+  el.innerHTML=`<div class="page-head"><div><h1>Ventas por ${dimLabel}</h1><p>Qué categorías venden más (en el período elegido)</p></div>
+    ${list.length?`<button class="btn btn-ghost" id="rcExp">${ICN.download} Exportar</button>`:''}</div>
+    <div class="card" style="margin-bottom:18px"><div style="padding:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:150px"><label>Agrupar por</label><select id="rcDim"><option value="linea" ${rcatDim==='linea'?'selected':''}>Línea</option><option value="marca" ${rcatDim==='marca'?'selected':''}>Marca</option></select></div>
+      <div class="field" style="margin:0"><label>Desde</label><input type="date" id="rcDesde" value="${rcatDesde}"></div>
+      <div class="field" style="margin:0"><label>Hasta</label><input type="date" id="rcHasta" value="${rcatHasta}"></div>
+      ${(rcatDesde||rcatHasta)?`<button class="btn btn-ghost btn-sm" id="rcClear">Limpiar</button>`:''}
+    </div></div>
+    ${list.length?`<div class="kpi-grid" style="margin-bottom:18px">
+      ${kpiCard('reportes','var(--brand)','var(--brand-soft)','Importe total',money(totalImp),totalU+' unidades',null)}
+      ${kpiCard('box','var(--purple)','var(--purple-soft)',dimLabel+'s con ventas',list.length,'categorías',null)}
+    </div>
+    <div class="grid-2" style="margin-bottom:18px">
+      <div class="card"><div class="section-title">Top 8 por importe</div><div style="padding:20px">${hbarsSVG(list.slice(0,8).map(x=>[(x.cat||'').slice(0,22),Math.round(x.importe)]))}</div></div>
+      <div class="card"><div class="section-title">Participación</div><div style="padding:14px 20px">${list.slice(0,8).map(x=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span class="cell-strong">${x.cat}</span><span class="cell-mono">${totalImp?Math.round(x.importe/totalImp*100):0}%</span></div><div style="height:7px;background:var(--surface-2);border-radius:20px;overflow:hidden"><div style="height:100%;width:${totalImp?x.importe/totalImp*100:0}%;background:linear-gradient(90deg,var(--brand),#6366f1);border-radius:20px"></div></div></div>`).join('')}</div></div>
+    </div>
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>#</th><th>${dimLabel}</th><th style="text-align:center">Unidades</th><th style="text-align:right">Importe</th><th style="text-align:right">%</th></tr></thead><tbody>
+      ${list.map((x,i)=>`<tr><td class="cell-mono">${i+1}</td><td class="cell-strong">${x.cat}</td><td style="text-align:center">${x.cant}</td><td style="text-align:right" class="cell-strong">${money(x.importe)}</td><td style="text-align:right" class="cell-mono">${totalImp?Math.round(x.importe/totalImp*100):0}%</td></tr>`).join('')}
+      </tbody><tfoot><tr><td colspan="2" class="cell-strong">TOTAL</td><td style="text-align:center" class="cell-strong">${totalU}</td><td style="text-align:right" class="cell-strong">${money(totalImp)}</td><td></td></tr></tfoot></table></div></div>`
+    :emptyState('Sin ventas en el período','Cambia el rango de fechas o registra ventas.')}`;
+  const set=(id,ev,fn)=>{const e=document.getElementById(id);if(e)e[ev]=fn;};
+  set('rcDim','onchange',e=>{rcatDim=e.target.value;go('repcategorias');});
+  set('rcDesde','onchange',e=>{rcatDesde=e.target.value;go('repcategorias');});
+  set('rcHasta','onchange',e=>{rcatHasta=e.target.value;go('repcategorias');});
+  set('rcClear','onclick',()=>{rcatDesde='';rcatHasta='';go('repcategorias');});
+  set('rcExp','onclick',()=>{ const rows=[[dimLabel.toLowerCase(),'unidades','importe','porcentaje'].join(',')].concat(list.map(x=>[csvCell(x.cat),x.cant,x.importe,(totalImp?Math.round(x.importe/totalImp*100):0)].join(','))); downloadCSV('ventas_por_'+rcatDim+'.csv',rows.join('\n')); toast('Exportado','success'); });
 };
 VIEWS.repinvvalorizado=(el)=>{
   const TC=tcActual();

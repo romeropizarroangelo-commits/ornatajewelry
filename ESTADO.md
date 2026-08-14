@@ -517,6 +517,13 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## REPORTE Ventas por Línea/Marca (2026-08-12)
+- ✅ `ventasPorCategoria(ventas, productos, dim, desde, hasta)` (puro/testeado): agrupa las líneas de venta por **línea o marca** (resuelve la categoría por id o código del producto), excluye anuladas, respeta rango de fechas. `VIEWS.repcategorias` (Reportes → Ventas por Línea/Marca): toggle Línea/Marca, filtro Desde/Hasta, KPIs, barras top-8 + participación %, tabla con TOTAL, y Exportar CSV.
+- **Verificación:** `tests/ventascategoria.test.js` — 9/9 (agrupa por línea/marca, excluye anuladas, rango de fechas, "(sin línea)"). **Suite total: 208/208.**
+- **Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.
