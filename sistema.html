@@ -2353,6 +2353,22 @@ function whatsappCotiz(c){
   msg+=`\n*TOTAL: ${sym} ${(Number(c.total)||0).toFixed(2)}*`;
   window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank');
 }
+// Recordatorio de cobranza por WhatsApp: recalcula la deuda del cliente (facturas+ND+letras) y arma un mensaje cordial.
+function whatsappCobranza(clienteId){
+  const cli=DB.clientes.find(x=>x.id===clienteId); if(!cli){ toast('Cliente no encontrado','error'); return; }
+  const hoy=new Date().toISOString().slice(0,10);
+  const docs=estadoCuentaDocs(cli,hoy); const r=resumenAntiguedad(docs);
+  if(!docs.length){ toast(cli.nombre+' no tiene deuda pendiente','error'); return; }
+  let tel=(cli.cel1||cli.tel||'').replace(/[^0-9]/g,''); if(tel.length===9) tel='51'+tel; // Perú
+  const vencidas=docs.filter(d=>Number(d.dias)>0).sort((a,b)=>b.dias-a.dias).slice(0,6);
+  let msg=`*${COMPANY.nombre}*\nRecordatorio de estado de cuenta\n\n`;
+  msg+=`Estimado(a) ${cli.nombre}:\nLe recordamos que registra un saldo pendiente con nosotros:\n\n`;
+  msg+=`• Deuda total: S/ ${(r.total).toFixed(2)}\n`;
+  if(totalVencido(r)>0.005) msg+=`• Monto vencido: S/ ${(totalVencido(r)).toFixed(2)}\n`;
+  if(vencidas.length){ msg+=`\nDocumentos vencidos:\n`; vencidas.forEach(d=>{ msg+=`• ${d.tipo} ${d.num} — S/ ${(Number(d.saldo)||0).toFixed(2)} (${d.dias} días)\n`; }); }
+  msg+=`\nAgradeceremos regularizar su cuenta a la brevedad. Ante cualquier consulta, estamos a su disposición.\nGracias por su preferencia.`;
+  window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`,'_blank');
+}
 function cotizAFactura(id){
   const c=DB.cotizaciones.find(x=>x.id===id); if(!c) return;
   confirmDialog('¿Convertir en factura?','Se generará una factura con estos productos y se descontará el stock.',async ()=>{
@@ -3788,7 +3804,7 @@ VIEWS.estadocuenta=(el)=>{
   const docs=cli?estadoCuentaDocs(cli,hoy):[];
   const r=resumenAntiguedad(docs);
   el.innerHTML=`<div class="page-head"><div><h1>Estado de Cuenta</h1><p>Deuda del cliente con antigüedad (30 / 60 / 90 días)</p></div>
-    ${cli&&docs.length?`<button class="btn btn-primary" id="ecPrint">${ICN.print} Imprimir estado</button>`:''}</div>
+    ${cli&&docs.length?`<div style="display:flex;gap:10px"><button class="btn btn-ghost" id="ecWA" style="color:#25D366">${ICN.whatsapp} Recordar por WhatsApp</button><button class="btn btn-primary" id="ecPrint">${ICN.print} Imprimir estado</button></div>`:''}</div>
     <div class="card" style="margin-bottom:18px"><div style="padding:16px"><div class="field" style="margin:0;max-width:440px"><label>Cliente</label>
       <select id="ecCli">${lista.map(c=>`<option value="${c.id}" ${ecClienteId===c.id?'selected':''}>${c.nombre}</option>`).join('')||'<option>(sin clientes)</option>'}</select></div>
       ${conDeuda.length?`<div style="color:var(--ink-3);font-size:12px;margin-top:8px">${conDeuda.length} cliente(s) con deuda pendiente</div>`:'<div style="color:var(--green);font-size:12px;margin-top:8px">Ningún cliente tiene deuda pendiente 🎉</div>'}</div></div>
@@ -3809,6 +3825,7 @@ VIEWS.estadocuenta=(el)=>{
     </div></div>`;
   document.getElementById('ecCli').onchange=e=>{ ecClienteId=e.target.value; go('estadocuenta'); };
   const pb=document.getElementById('ecPrint'); if(pb) pb.onclick=()=>printEstadoCuenta(cli, docs, r, hoy);
+  const wa=document.getElementById('ecWA'); if(wa) wa.onclick=()=>whatsappCobranza(ecClienteId);
 };
 /* ---------- RANKING DE MOROSOS (reusa el motor de antigüedad) ---------- */
 function totalVencido(r){ return R2((Number(r.d1_30)||0)+(Number(r.d31_60)||0)+(Number(r.d61_90)||0)+(Number(r.d90)||0)); }
@@ -3847,11 +3864,12 @@ VIEWS.morosos=(el)=>{
         <td style="text-align:right">${x.porVencer?money(x.porVencer):'—'}</td><td style="text-align:right">${x.d1_30?money(x.d1_30):'—'}</td><td style="text-align:right">${x.d31_60?money(x.d31_60):'—'}</td><td style="text-align:right">${x.d61_90?money(x.d61_90):'—'}</td>
         <td style="text-align:right;color:${x.d90?'var(--red)':''}">${x.d90?money(x.d90):'—'}</td>
         <td style="text-align:right;color:${x.vencido>0.005?'var(--red)':''}" class="cell-strong">${money(x.vencido)}</td><td style="text-align:right" class="cell-strong">${money(x.total)}</td>
-        <td><button class="icon-btn" title="Ver estado de cuenta" data-ec="${x.id}">${ICN.eye}</button></td></tr>`).join('')||emptyRow(12)}
+        <td><div class="row-actions"><button class="icon-btn" title="Ver estado de cuenta" data-ec="${x.id}">${ICN.eye}</button><button class="icon-btn" title="Recordar por WhatsApp" data-wa="${x.id}" style="color:#25D366">${ICN.whatsapp}</button></div></td></tr>`).join('')||emptyRow(12)}
       </tbody><tfoot><tr><td colspan="9" class="cell-strong">TOTALES</td><td style="text-align:right" class="cell-strong">${money(vencidoTot)}</td><td style="text-align:right" class="cell-strong">${money(cartera)}</td><td></td></tr></tfoot></table></div></div>`;
   document.getElementById('moVend').onchange=e=>{ morososVend=e.target.value; go('morosos'); };
   document.getElementById('moSolo').onchange=e=>{ morososSoloVencido=e.target.checked; go('morosos'); };
   el.querySelectorAll('[data-ec]').forEach(b=>b.onclick=()=>{ ecClienteId=b.dataset.ec; go('estadocuenta'); });
+  el.querySelectorAll('[data-wa]').forEach(b=>b.onclick=()=>whatsappCobranza(b.dataset.wa));
   const ex=document.getElementById('moExp'); if(ex) ex.onclick=()=>{ const rows=[['#','cliente','vendedor','dias_max','por_vencer','1_30','31_60','61_90','mas_90','vencido','total'].join(',')].concat(data.map((x,i)=>[i+1,csvCell(x.cliente),csvCell(x.vendedor),x.maxDias,x.porVencer,x.d1_30,x.d31_60,x.d61_90,x.d90,x.vencido,x.total].join(','))); downloadCSV('morosos.csv',rows.join('\n')); toast('Ranking exportado','success'); };
   const pb=document.getElementById('moPrint'); if(pb) pb.onclick=()=>printMorosos(data, cartera, vencidoTot, hoy);
 };
