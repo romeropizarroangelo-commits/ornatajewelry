@@ -483,6 +483,25 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## PERFILES GRANULAR — permisos por usuario/página/acción (2026-08-12)
+
+> Réplica del módulo Perfiles del SGAE (matriz de permisos por usuario, menú, página y acción + sub-funciones de costo/margen). Antes: solo roles admin/vendedor.
+
+- ✅ **Modelo**: `usuario.permisos = { [viewId]:{ver,registrar,editar,eliminar,anular} }` + `usuario.funciones = {verCosto,verHistorialCostos,modificarMargen,verFOB}`. Aditivo: un usuario **sin matriz hereda el comportamiento por rol** (todo salvo vistas admin) → 100% compatible con los usuarios actuales.
+- ✅ **Helpers** (puros/testeados): `permActual(u,view,accion)` (matriz explícita > herencia), `puede(view,accion)` (admin=todo, dashboard siempre), `funcPermitida(fn)`.
+- ✅ **Aplicado de verdad**: el **menú** (`visible`) y **`go()`** ahora gatean por `puede(view,'ver')` por usuario (antes era el binario `ADMIN_VIEWS`). El permiso **Anular** se aplica en Ventas. La función **Ver costos** se conecta al ocultamiento de costos (CSS `.rol-vendedor:not(.ver-costo)`), así un vendedor con ese permiso ve costos.
+- ✅ **UI Perfiles**: selector de usuario + mostrar inactivos + Nuevo/Editar/Eliminar; para un vendedor, **matriz** por sección de menú (Consultar/Registrar/Editar/Eliminar/Anular por página) + **funciones especiales**; guarda al instante; para un admin muestra "acceso total".
+
+**Nota de alcance:** hoy se **aplica** el permiso de acceso (`ver`) en todo el sistema + `anular` en ventas + `verCosto`. Los demás (registrar/editar/eliminar por página) quedan **guardados y disponibles** vía `puede()` para engancharse módulo a módulo de forma incremental (evita un refactor masivo y riesgoso de una vez).
+
+**Verificación:** `tests/perfiles.test.js` — 10/10 (herencia por rol; la matriz explícita manda; acciones no definidas heredan). **Suite total: 182/182.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+**✅ TODAS las pantallas del SGAE que el usuario mostró están replicadas y potenciadas.** Lo único que resta es Fase 5 (backend + facturación electrónica SUNAT), que exige servidor y decisión del usuario.
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.

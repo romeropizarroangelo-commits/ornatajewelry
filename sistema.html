@@ -317,7 +317,7 @@
   .hidden { display: none !important; }
 
   /* Roles: el vendedor NO ve elementos marcados .solo-admin */
-  .rol-vendedor .solo-admin { display: none !important; }
+  .rol-vendedor:not(.ver-costo) .solo-admin { display: none !important; }
 
   /* Login */
   .login-screen { position: fixed; inset: 0; z-index: 300; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -746,7 +746,7 @@ function navLeafHTML(it, sub){
 
 function renderNav(){
   const nav = document.getElementById('nav');
-  const visible = (it)=> !it.adminOnly || esAdmin();
+  const visible = (it)=> (!it.adminOnly || esAdmin()) && (!it.id || puede(it.id,'ver'));
   nav.innerHTML = MENU.map(node => {
     if(!node.children) return visible(node) ? navLeafHTML(node, false) : '';
     const kids = node.children.filter(visible);
@@ -767,7 +767,7 @@ function renderNav(){
 
 const ADMIN_VIEWS = new Set(['configuracion','perfiles','repmargen','cierremensual','unioncodigo','empresas','reppagos']);
 function go(view){
-  if(ADMIN_VIEWS.has(view) && !esAdmin()){ toast('Solo el administrador puede acceder','error'); view='dashboard'; }
+  if(!puede(view,'ver')){ toast('No tienes permiso para acceder a esta página','error'); view='dashboard'; }
   currentView = view;
   const meta = META[view] || { label:view, icon:'box' };
   document.getElementById('pageTitle').textContent = meta.label;
@@ -1293,6 +1293,7 @@ function renderVentaLista(){
   b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>{
     const v=DB.ventas.find(z=>z.id===x.dataset.del); if(!v) return;
     if(v.estado==='Anulada'){ toast('Esta venta ya está anulada','error'); return; }
+    if(!puede('ventas','anular')){ toast('No tienes permiso para anular ventas','error'); return; }
     confirmDialog('¿Anular venta '+v.num+'?','Se marcará como ANULADA (el documento NO se borra) y se repondrá el stock de sus productos.',async ()=>{
       try {
         await commit(()=>{
@@ -2415,30 +2416,70 @@ VIEWS.configuracion=(el)=>{
 };
 
 /* ---------- PERFILES / USUARIOS (solo admin) ---------- */
+let perfUserId=null, perfMenuKey=null, perfShowInactive=false;
+const PERM_ACC=[['ver','Consultar'],['registrar','Registrar'],['editar','Editar'],['eliminar','Eliminar'],['anular','Anular']];
+const PERM_FUNC=[['verCosto','Ver costos y valores'],['verHistorialCostos','Ver historial de costos'],['modificarMargen','Modificar margen'],['verFOB','Ver costo FOB (importación)']];
 VIEWS.perfiles=(el)=>{
+  const users=DB.usuarios.filter(u=>perfShowInactive || u.activo!==false);
+  if(!perfUserId || !DB.usuarios.some(u=>u.id===perfUserId)) perfUserId=(users[0]||DB.usuarios[0]||{}).id||null;
+  const secciones=MENU.filter(n=>n.children);
+  if(!perfMenuKey || !secciones.some(s=>s.key===perfMenuKey)) perfMenuKey=(secciones[0]||{}).key;
+  const u=DB.usuarios.find(x=>x.id===perfUserId);
   el.innerHTML=`
-    <div class="page-head"><div><h1>Perfiles / Usuarios</h1><p>Quién entra al sistema y qué puede ver</p></div>
+    <div class="page-head"><div><h1>Perfiles</h1><p>Usuarios y permisos por página y acción</p></div>
       <button class="btn btn-primary" id="addUser">${ICN.plus} Nuevo usuario</button></div>
-    <div class="card"><div class="table-wrap">
-      <table><thead><tr><th>Usuario</th><th>Acceso</th><th>Rol</th><th style="text-align:center">Estado</th><th></th></tr></thead><tbody>
-      ${DB.usuarios.map(u=>`<tr>
-        <td><div class="prod-cell"><div class="avatar" style="width:34px;height:34px;font-size:13px">${(u.nombre||'?').charAt(0)}</div><div class="cell-strong">${u.nombre}</div></div></td>
-        <td class="cell-mono">${u.usuario}</td>
-        <td>${u.rol==='admin'?'<span class="badge badge-blue">Administrador</span>':'<span class="badge badge-gray">Vendedor</span>'}</td>
-        <td style="text-align:center">${u.activo!==false?'<span class="badge badge-green">Activo</span>':'<span class="badge badge-red">Inactivo</span>'}</td>
-        <td><div class="row-actions"><button class="icon-btn" data-edit="${u.id}">${ICN.edit}</button><button class="icon-btn del" data-del="${u.id}">${ICN.del}</button></div></td>
-      </tr>`).join('')}
-      </tbody></table></div></div>
-    <p style="color:var(--ink-3);font-size:12.5px;margin-top:12px">El <b>Vendedor</b> no ve costos ni el módulo de configuración. Cada venta, compra y movimiento queda registrado con el usuario que lo hizo.</p>`;
+    <div class="card" style="margin-bottom:18px"><div class="section-title">Registro de perfiles</div>
+      <div style="padding:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <div class="field" style="margin:0;min-width:260px"><label>Usuario</label><select id="perfUser">${users.map(x=>`<option value="${x.id}" ${perfUserId===x.id?'selected':''}>${x.nombre} · ${x.usuario}${x.activo===false?' (inactivo)':''}</option>`).join('')||'<option>(sin usuarios)</option>'}</select></div>
+        <button class="btn btn-ghost" id="editUser">${ICN.edit} Editar</button>
+        <button class="btn btn-ghost" id="delUser">${ICN.del} Eliminar</button>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding-bottom:10px"><input type="checkbox" id="perfInact" ${perfShowInactive?'checked':''}> Mostrar inactivos</label>
+      </div></div>
+    ${!u?'':(u.rol==='admin'
+      ? `<div class="card" style="padding:28px;text-align:center;color:var(--ink-2)"><div style="font-size:15px"><b>${u.nombre}</b> es <span class="badge badge-blue">Administrador</span></div><p style="margin-top:8px">Tiene acceso total al sistema. Para asignar permisos específicos, cambia su rol a <b>Vendedor</b> (botón Editar).</p></div>`
+      : renderPermMatrixHTML(u, perfMenuKey, secciones))}`;
   document.getElementById('addUser').onclick=()=>userModal();
-  el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>userModal(b.dataset.edit));
-  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
-    const u=DB.usuarios.find(x=>x.id===b.dataset.del); if(!u) return;
-    if(SESSION && u.id===SESSION.id){ toast('No puedes eliminar tu propio usuario','error'); return; }
-    if(u.rol==='admin' && DB.usuarios.filter(x=>x.rol==='admin'&&x.activo!==false).length<=1){ toast('Debe quedar al menos un administrador','error'); return; }
-    confirmDialog('¿Eliminar usuario?','',()=>{ DB.usuarios=DB.usuarios.filter(x=>x.id!==b.dataset.del); save(); go('perfiles'); toast('Usuario eliminado','success'); });
-  });
+  document.getElementById('editUser').onclick=()=>{ if(perfUserId) userModal(perfUserId); };
+  document.getElementById('perfUser').onchange=e=>{ perfUserId=e.target.value; go('perfiles'); };
+  document.getElementById('perfInact').onchange=e=>{ perfShowInactive=e.target.checked; go('perfiles'); };
+  document.getElementById('delUser').onclick=()=>{
+    const uu=DB.usuarios.find(x=>x.id===perfUserId); if(!uu) return;
+    if(SESSION && uu.id===SESSION.id){ toast('No puedes eliminar tu propio usuario','error'); return; }
+    if(uu.rol==='admin' && DB.usuarios.filter(x=>x.rol==='admin'&&x.activo!==false).length<=1){ toast('Debe quedar al menos un administrador','error'); return; }
+    confirmDialog('¿Eliminar usuario?','',()=>{ DB.usuarios=DB.usuarios.filter(x=>x.id!==uu.id); perfUserId=null; save(); go('perfiles'); toast('Usuario eliminado','success'); });
+  };
+  wirePermMatrix(u, secciones);
 };
+function renderPermMatrixHTML(u, menuKey, secciones){
+  const sec=secciones.find(s=>s.key===menuKey)||secciones[0];
+  const pages=(sec&&sec.children)||[];
+  return `
+    <div class="card" style="margin-bottom:18px"><div style="padding:16px;display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;border-bottom:1px solid var(--line)">
+      <div class="field" style="margin:0;min-width:220px"><label>Menú</label><select id="perfMenu">${secciones.map(s=>`<option value="${s.key}" ${s.key===menuKey?'selected':''}>${s.label}</option>`).join('')}</select></div>
+      <div style="color:var(--ink-3);font-size:12.5px;padding-bottom:10px">Marca lo que <b>${u.nombre}</b> puede hacer en cada página. Se guarda al instante.</div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Página</th>${PERM_ACC.map(a=>`<th style="text-align:center">${a[1]}</th>`).join('')}</tr></thead><tbody>
+      ${pages.map(pg=>`<tr><td class="cell-strong">${pg.label}${pg.adminOnly?' <span class="badge badge-gray" style="font-size:9px">admin</span>':''}</td>${PERM_ACC.map(a=>`<td style="text-align:center"><input type="checkbox" class="perm-tg" data-view="${pg.id}" data-acc="${a[0]}" ${permActual(u,pg.id,a[0])?'checked':''}></td>`).join('')}</tr>`).join('')||emptyRow(6)}
+    </tbody></table></div></div>
+    <div class="card"><div class="section-title">Funciones especiales (costos y márgenes)</div><div class="table-wrap">
+      <table><thead><tr><th>Función</th><th style="text-align:center">Permiso</th></tr></thead><tbody>
+      ${PERM_FUNC.map(f=>`<tr><td class="cell-strong">${f[1]}</td><td style="text-align:center"><input type="checkbox" class="func-tg" data-fn="${f[0]}" ${(u.funciones&&u.funciones[f[0]])?'checked':''}></td></tr>`).join('')}
+      </tbody></table></div></div>`;
+}
+function wirePermMatrix(u, secciones){
+  if(!u || u.rol==='admin') return;
+  const menuSel=document.getElementById('perfMenu'); if(menuSel) menuSel.onchange=e=>{ perfMenuKey=e.target.value; go('perfiles'); };
+  const persistUser=()=>{ save(); renderNav(); if(SESSION && SESSION.id===u.id) applyRole(); };
+  document.querySelectorAll('.perm-tg').forEach(cb=>cb.onchange=()=>{
+    const uu=DB.usuarios.find(x=>x.id===u.id); if(!uu) return;
+    uu.permisos=uu.permisos||{}; uu.permisos[cb.dataset.view]=uu.permisos[cb.dataset.view]||{};
+    uu.permisos[cb.dataset.view][cb.dataset.acc]=cb.checked; persistUser();
+  });
+  document.querySelectorAll('.func-tg').forEach(cb=>cb.onchange=()=>{
+    const uu=DB.usuarios.find(x=>x.id===u.id); if(!uu) return;
+    uu.funciones=uu.funciones||{}; uu.funciones[cb.dataset.fn]=cb.checked; persistUser();
+  });
+}
 function userModal(id){
   const u=id?DB.usuarios.find(x=>x.id===id):{rol:'vendedor',activo:true};
   openModal(id?'Editar usuario':'Nuevo usuario',`<div class="form-grid">
@@ -3869,7 +3910,22 @@ document.addEventListener('keydown',(e)=>{
 let SESSION = null;
 function esAdmin(){ return !!(SESSION && SESSION.rol==='admin'); }
 function usuarioActual(){ return SESSION ? SESSION.usuario : ''; }
-function applyRole(){ document.body.classList.toggle('rol-vendedor', !esAdmin()); }
+/* ===== Permisos granulares (Perfiles). El admin tiene acceso total; un usuario SIN matriz
+   definida hereda el comportamiento por rol (todo salvo vistas admin). permActual es puro. ===== */
+function usuarioSesion(){ return SESSION ? (DB.usuarios.find(x=>x.id===SESSION.id)||SESSION) : null; }
+function permActual(u, view, accion){
+  if(u && u.permisos && u.permisos[view] && u.permisos[view][accion]!==undefined) return !!u.permisos[view][accion];
+  if(ADMIN_VIEWS.has(view)) return false;   // vistas admin: no permitidas por defecto al no-admin
+  return true;                               // el resto: permitido por defecto (como hoy)
+}
+function puede(view, accion){
+  if(view==='dashboard' || view==='login') return true;
+  const u=usuarioSesion(); if(!u) return false;
+  if(u.rol==='admin') return true;
+  return permActual(u, view, accion||'ver');
+}
+function funcPermitida(fn){ const u=usuarioSesion(); if(!u) return false; if(u.rol==='admin') return true; return !!(u.funciones && u.funciones[fn]); }
+function applyRole(){ document.body.classList.toggle('rol-vendedor', !esAdmin()); document.body.classList.toggle('ver-costo', esAdmin()||funcPermitida('verCosto')); }
 function showLogin(){
   const el=document.getElementById('loginScreen');
   const users=(DB.usuarios||[]).filter(u=>u.activo!==false);

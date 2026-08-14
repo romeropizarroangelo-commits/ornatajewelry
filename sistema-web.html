@@ -311,7 +311,7 @@
   .hidden { display: none !important; }
 
   /* Roles: el vendedor NO ve elementos marcados .solo-admin */
-  .rol-vendedor .solo-admin { display: none !important; }
+  .rol-vendedor:not(.ver-costo) .solo-admin { display: none !important; }
 
   /* Login */
   .login-screen { position: fixed; inset: 0; z-index: 300; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -739,7 +739,7 @@ function navLeafHTML(it, sub){
 
 function renderNav(){
   const nav = document.getElementById('nav');
-  const visible = (it)=> !it.adminOnly || esAdmin();
+  const visible = (it)=> (!it.adminOnly || esAdmin()) && (!it.id || puede(it.id,'ver'));
   nav.innerHTML = MENU.map(node => {
     if(!node.children) return visible(node) ? navLeafHTML(node, false) : '';
     const kids = node.children.filter(visible);
@@ -760,7 +760,7 @@ function renderNav(){
 
 const ADMIN_VIEWS = new Set(['configuracion','perfiles','repmargen','cierremensual','unioncodigo','empresas','reppagos']);
 function go(view){
-  if(ADMIN_VIEWS.has(view) && !esAdmin()){ toast('Solo el administrador puede acceder','error'); view='dashboard'; }
+  if(!puede(view,'ver')){ toast('No tienes permiso para acceder a esta página','error'); view='dashboard'; }
   currentView = view;
   const meta = META[view] || { label:view, icon:'box' };
   document.getElementById('pageTitle').textContent = meta.label;
@@ -1286,6 +1286,7 @@ function renderVentaLista(){
   b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>{
     const v=DB.ventas.find(z=>z.id===x.dataset.del); if(!v) return;
     if(v.estado==='Anulada'){ toast('Esta venta ya está anulada','error'); return; }
+    if(!puede('ventas','anular')){ toast('No tienes permiso para anular ventas','error'); return; }
     confirmDialog('¿Anular venta '+v.num+'?','Se marcará como ANULADA (el documento NO se borra) y se repondrá el stock de sus productos.',async ()=>{
       try {
         await commit(()=>{
