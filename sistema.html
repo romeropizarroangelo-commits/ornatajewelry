@@ -1794,7 +1794,7 @@ function compraTotales(lines, igvRate, conIGV){
 function periodoActual(){ return new Date().toISOString().slice(0,7).replace('-',''); }
 function renderNuevaCompra(){
   const hoy=new Date().toISOString().slice(0,10);
-  compra={ tipoDoc:'Factura', proveedor:DB.proveedores[0]?.nombre||'', serie:'', numero:'', moneda:'S/', tc:tcActual(),
+  compra={ tipoDoc:'Factura', proveedor:DB.proveedores[0]?.nombre||'', distrito:'', serie:'', numero:'', moneda:'S/', tc:tcActual(),
     igvRate:0.18, conIGV:true, guia:'', periodo:periodoActual(), emision:hoy, ingreso:hoy, vcto:hoy,
     metodo:'Contado', caja:'CAJA 1', lines:[], search:'' };
   drawCompra();
@@ -1808,6 +1808,7 @@ function drawCompra(){
       <div class="form-grid" style="padding:16px">
         <div class="field"><label>Tipo doc.</label><select id="cTipoDoc"><option ${compra.tipoDoc==='Factura'?'selected':''}>Factura</option><option ${compra.tipoDoc==='Boleta'?'selected':''}>Boleta</option><option ${compra.tipoDoc==='Recibo'?'selected':''}>Recibo</option></select></div>
         <div class="field"><label>Proveedor</label><select id="compraProv">${DB.proveedores.map(p=>`<option ${compra.proveedor===p.nombre?'selected':''}>${p.nombre}</option>`).join('')||'<option value="">(sin proveedores)</option>'}</select></div>
+        <div class="field"><label>Distrito</label><input id="cDistrito" value="${compra.distrito||''}" placeholder="Ej. La Victoria"></div>
         <div class="field"><label>Serie</label><input id="cSerie" value="${compra.serie}" placeholder="F001"></div>
         <div class="field"><label>Número</label><input id="cNumero" value="${compra.numero}" placeholder="0001234"></div>
         <div class="field"><label>Moneda</label><select id="cMoneda"><option ${mon==='S/'?'selected':''}>S/</option><option ${mon==='US$'?'selected':''}>US$</option></select></div>
@@ -1857,6 +1858,7 @@ function drawCompra(){
   const set=(id,ev,fn)=>{const e=document.getElementById(id);if(e)e[ev]=fn;};
   set('cTipoDoc','onchange',e=>{compra.tipoDoc=e.target.value;});
   set('compraProv','onchange',e=>{compra.proveedor=e.target.value;});
+  set('cDistrito','onchange',e=>{compra.distrito=e.target.value.trim();});
   set('cSerie','onchange',e=>{compra.serie=e.target.value.trim();});
   set('cNumero','onchange',e=>{compra.numero=e.target.value.trim();});
   set('cMoneda','onchange',e=>{compra.moneda=e.target.value;drawCompra();});
@@ -1902,7 +1904,7 @@ async function emitirCompra(){
         // Costo promedio ponderado sobre la BASE (sin IGV). Si no había costo, lo establece esta compra.
         p.costo = (costoPrev>0 && stockPrev>0) ? (stockPrev*costoPrev + l.cant*Number(l.costo)) / (stockPrev+l.cant) : Number(l.costo)||0;
         recordMov(p,'COMPRA',numProv||num,l.cant,{razon:compra.proveedor,costo:Number(l.costo)||Number(p.costo)||0,tc:compra.tc,moneda:compra.moneda||'S/'});});
-      DB.compras.unshift({ id:uid(), num, numProv, tipoDoc:compra.tipoDoc, fecha:compra.emision||new Date().toISOString().slice(0,10),
+      DB.compras.unshift({ id:uid(), num, numProv, tipoDoc:compra.tipoDoc, distrito:compra.distrito, fecha:compra.emision||new Date().toISOString().slice(0,10),
         ingreso:compra.ingreso, vcto:compra.vcto, periodo:compra.periodo, guia:compra.guia, moneda:compra.moneda, tc:compra.tc,
         proveedor:compra.proveedor, items:compra.lines.reduce((s,l)=>s+l.cant,0), subtotal:t.subtotal, igv:t.igv, total:t.total,
         estado:compra.metodo==='Crédito'?'Pendiente':'Pagada', saldo:(compra.metodo==='Crédito'?t.total:0), abonado:(compra.metodo==='Crédito'?0:t.total),
@@ -3110,7 +3112,8 @@ function recibirImp(id){
 /* ---------- LETRAS (cobrar / pagar a plazo) ---------- */
 let letrasTipo='cobrar';
 function addMonths(dateStr, m){ const parts=String(dateStr||'').split('-').map(Number); const d=new Date(parts[0], (parts[1]-1)+m, parts[2]||1); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
-function letraEstado(l){ if(l.estado==='Pagada') return 'Pagada'; const hoy=new Date().toISOString().slice(0,10); return (l.fechaVencimiento && l.fechaVencimiento<hoy)?'Vencida':'Pendiente'; }
+function letraSaldo(l){ if(!l) return 0; if(l.estado==='Pagada') return 0; return Number(l.saldo!=null?l.saldo:l.monto)||0; }
+function letraEstado(l){ if(l.estado==='Pagada' || letraSaldo(l)<=0.005) return 'Pagada'; const hoy=new Date().toISOString().slice(0,10); if(l.fechaVencimiento && l.fechaVencimiento<hoy) return 'Vencida'; return l.estado==='Parcial'?'Parcial':'Pendiente'; }
 // Genera N letras que suman EXACTAMENTE el total; la última ajusta el redondeo. Vencimientos mensuales.
 function generarLetras(montoTotal, n, venc0){
   n=Math.max(1,Math.floor(n)); montoTotal=Number(montoTotal)||0;
@@ -3150,19 +3153,50 @@ VIEWS.letras=(el)=>{
 function renderLetras(){
   const b=document.getElementById('ltBody');
   const list=DB.letras.filter(l=>l.tipo===letrasTipo).sort((a,b)=>(a.fechaVencimiento||'').localeCompare(b.fechaVencimiento||''));
-  const pend=list.filter(l=>l.estado!=='Pagada').reduce((s,l)=>s+Number(l.monto||0),0);
-  const venc=list.filter(l=>letraEstado(l)==='Vencida').reduce((s,l)=>s+Number(l.monto||0),0);
+  const pend=list.filter(l=>l.estado!=='Pagada').reduce((s,l)=>s+letraSaldo(l),0);
+  const venc=list.filter(l=>letraEstado(l)==='Vencida').reduce((s,l)=>s+letraSaldo(l),0);
   b.innerHTML=`<div class="kpi-grid">
     ${kpiCard('cobrar','var(--amber)','var(--amber-soft)',letrasTipo==='cobrar'?'Por cobrar en letras':'Por pagar en letras',money(pend),list.filter(l=>l.estado!=='Pagada').length+' letras pendientes',null)}
     ${kpiCard('alert',venc?'var(--red)':'var(--green)',venc?'var(--red-soft)':'var(--green-soft)','Vencido',money(venc),venc?'requiere atención':'al día',venc?false:null)}
   </div>
   <div class="card"><div class="section-title">Letras ${letrasTipo==='cobrar'?'por cobrar':'por pagar'}</div><div class="table-wrap">
-  <table><thead><tr><th>Número</th><th>${letrasTipo==='cobrar'?'Cliente':'Proveedor'}</th><th>Doc.</th><th>Banco</th><th>Emisión</th><th>Vencimiento</th><th style="text-align:right">Monto</th><th>Estado</th><th></th></tr></thead><tbody>
-  ${list.map(l=>{const est=letraEstado(l);const badge=est==='Pagada'?'<span class="badge badge-green">Pagada</span>':est==='Vencida'?'<span class="badge badge-red">Vencida</span>':'<span class="badge badge-amber">Pendiente</span>';return `<tr><td class="cell-mono cell-strong">${l.num}</td><td class="cell-strong">${l.entidad}</td><td class="cell-mono">${l.docRef||'—'}</td><td>${l.banco||'—'}</td><td>${fmtDate(l.fechaEmision)}</td><td>${fmtDate(l.fechaVencimiento)}</td><td style="text-align:right" class="cell-strong">${money(l.monto)}</td><td>${badge}</td>
-    <td><div class="row-actions">${l.estado!=='Pagada'?`<button class="btn btn-primary btn-sm" data-pay="${l.id}">${ICN.check} ${letrasTipo==='cobrar'?'Cobrar':'Pagar'}</button>`:''}<button class="icon-btn del" data-del="${l.id}">${ICN.del}</button></div></td></tr>`;}).join('')||emptyRow(9)}
+  <table><thead><tr><th>Número</th><th>${letrasTipo==='cobrar'?'Cliente':'Proveedor'}</th><th>Doc.</th><th>Banco</th><th>Emisión</th><th>Vencimiento</th><th style="text-align:right">Monto</th><th style="text-align:right">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${list.map(l=>{const est=letraEstado(l);const badge=est==='Pagada'?'<span class="badge badge-green">Pagada</span>':est==='Vencida'?'<span class="badge badge-red">Vencida</span>':est==='Parcial'?'<span class="badge badge-amber">Parcial</span>':'<span class="badge badge-amber">Pendiente</span>';const sal=letraSaldo(l);return `<tr><td class="cell-mono cell-strong">${l.num}${l.grupo?' <span class="badge" style="background:var(--surface-2);color:var(--ink-3);font-size:9px">canje</span>':''}</td><td class="cell-strong">${l.entidad}</td><td class="cell-mono">${l.docRef||'—'}</td><td>${l.banco||'—'}</td><td>${fmtDate(l.fechaEmision)}</td><td>${fmtDate(l.fechaVencimiento)}</td><td style="text-align:right" class="cell-strong">${money(l.monto)}</td><td style="text-align:right" class="cell-mono">${money(sal)}</td><td>${badge}</td>
+    <td><div class="row-actions">${est!=='Pagada'?`<button class="btn btn-primary btn-sm" data-pay="${l.id}">${ICN.check} ${letrasTipo==='cobrar'?'Cobrar':'Pagar'}</button>`:''}<button class="icon-btn del" data-del="${l.id}" title="${l.grupo?'Anular canje':'Eliminar'}">${ICN.del}</button></div></td></tr>`;}).join('')||emptyRow(10)}
   </tbody></table></div></div>`;
-  b.querySelectorAll('[data-pay]').forEach(x=>x.onclick=()=>{ const l=DB.letras.find(z=>z.id===x.dataset.pay); l.estado='Pagada'; l.fechaPago=new Date().toISOString().slice(0,10); save(); renderLetras(); toast('Letra '+l.num+' '+(letrasTipo==='cobrar'?'cobrada':'pagada'),'success'); });
-  b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>confirmDialog('¿Eliminar letra?','',()=>{DB.letras=DB.letras.filter(z=>z.id!==x.dataset.del);save();renderLetras();toast('Letra eliminada','success');}));
+  b.querySelectorAll('[data-pay]').forEach(x=>x.onclick=()=>pagarLetra(x.dataset.pay));
+  b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>{ const l=DB.letras.find(z=>z.id===x.dataset.del); if(!l) return;
+    if(l.grupo){ const hermanas=DB.letras.filter(z=>z.grupo===l.grupo); confirmDialog('¿Anular el canje?','Se eliminarán las '+hermanas.length+' letra(s) de este canje y las facturas vuelven a su saldo original (Cuentas por '+(letrasTipo==='cobrar'?'Cobrar':'Pagar')+').',()=>{
+        commit(()=>revertirCanje(l.grupo)).then(()=>{ renderLetras(); toast('Canje anulado — facturas restauradas','success'); }).catch(()=>toast('No se pudo anular','error')); }); }
+    else confirmDialog('¿Eliminar letra?','',()=>{DB.letras=DB.letras.filter(z=>z.id!==l.id);save();renderLetras();toast('Letra eliminada','success');});
+  });
+}
+// Pago (o cobro) de una letra, con abono parcial. Actualiza saldo/estado de la letra.
+function pagarLetra(id){
+  const l=DB.letras.find(z=>z.id===id); if(!l) return;
+  const saldo=letraSaldo(l);
+  openModal((letrasTipo==='cobrar'?'Cobrar':'Pagar')+' letra '+l.num, `<div class="form-grid">
+    <div class="field"><label>Saldo actual</label><input value="${money(saldo)}" disabled></div>
+    <div class="field"><label>Monto a ${letrasTipo==='cobrar'?'cobrar':'pagar'} <span class="req">*</span></label><input id="pl_monto" type="number" step="0.01" min="0" value="${saldo}"></div>
+    <div class="field"><label>Fecha</label><input id="pl_fecha" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="field"><label>Banco / operación</label><input id="pl_banco" value="${l.banco||''}" placeholder="Opcional"></div>
+  </div>`, ()=>{
+    let abono=Number(val('pl_monto'))||0; if(abono<=0){toast('Ingresa un monto','error');return false;}
+    if(abono>saldo+0.005) abono=saldo;
+    commit(()=>{ const z=DB.letras.find(y=>y.id===id); const nuevo=R2(letraSaldo(z)-abono);
+      z.saldo=nuevo; z.abonado=R2((Number(z.abonado)||0)+abono); z.banco=val('pl_banco')||z.banco;
+      z.estado=nuevo<=0.005?'Pagada':'Parcial'; if(nuevo<=0.005) z.fechaPago=val('pl_fecha')||new Date().toISOString().slice(0,10);
+    }).then(()=>{ renderLetras(); toast('Letra '+l.num+' — '+money(abono)+(letrasTipo==='cobrar'?' cobrado':' pagado'),'success'); }).catch(()=>toast('No se pudo registrar','error'));
+    return true;
+  });
+}
+// Anula un canje: restaura el saldo de las facturas canjeadas y elimina las letras del grupo.
+function revertirCanje(grupo){
+  const letras=DB.letras.filter(l=>l.grupo===grupo);
+  const ids=new Set(); letras.forEach(l=>(l.docIds||[]).forEach(id=>ids.add(id)));
+  const docs=[...DB.ventas, ...DB.compras];
+  ids.forEach(id=>{ const d=docs.find(x=>x.id===id); if(d && d.estado==='Canjeada'){ d.saldo=R2(Number(d.total||0)-Number(d.abonado||0)); delete d.canjeadaLetra; d.estado=estadoPorSaldo(d); } });
+  DB.letras=DB.letras.filter(l=>l.grupo!==grupo);
 }
 function letraModal(){
   const hoy=new Date().toISOString().slice(0,10);
@@ -3181,7 +3215,7 @@ function letraModal(){
     const venc0=val('lt_venc')||hoy, banco=val('lt_banco'), doc=val('lt_doc');
     const base='LT-'+String(1000+DB.letras.length+1);
     const cuotas=generarLetras(montoTotal, n, venc0);
-    cuotas.forEach((c,i)=>{ DB.letras.unshift({ id:uid(), num: n>1?(base+'-'+(i+1)+'/'+n):base, tipo:letrasTipo, entidadId:val('lt_ent'), entidad:ent?ent.nombre:'—', docRef:doc, monto:c.monto, fechaEmision:hoy, fechaVencimiento:c.fechaVencimiento, estado:'Pendiente', banco, usuario:usuarioActual() }); });
+    cuotas.forEach((c,i)=>{ DB.letras.unshift({ id:uid(), num: n>1?(base+'-'+(i+1)+'/'+n):base, tipo:letrasTipo, entidadId:val('lt_ent'), entidad:ent?ent.nombre:'—', docRef:doc, monto:c.monto, saldo:c.monto, abonado:0, fechaEmision:hoy, fechaVencimiento:c.fechaVencimiento, estado:'Pendiente', banco, usuario:usuarioActual() }); });
     persist().then(()=>{renderLetras();toast(n+' letra(s) generada(s)','success');}).catch(()=>toast('No se pudo guardar','error'));
     return true;
   });

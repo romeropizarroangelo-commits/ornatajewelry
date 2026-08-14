@@ -414,6 +414,30 @@ Con SCHEMA_VERSION al día (`cierres:[]`, `empresas:[]` en seed + normalize) y m
 
 ---
 
+## PULIDO PROFESIONAL (2026-08-12)
+
+- ✅ **Reversa del canje** (`revertirCanje`, testeado): borrar una letra de un canje ahora pregunta y **restaura el saldo de las facturas** (vuelven a Pendiente/Parcial) y elimina todas las letras del grupo, atómico. Antes se perdía la deuda. Las letras de canje muestran una etiqueta "canje".
+- ✅ **Pago parcial de letras** (`pagarLetra` + `letraSaldo`, testeado): cobrar/pagar una letra abre un modal con **abono** (parcial o total); la letra lleva **saldo** y estado Pendiente/**Parcial**/Pagada. Nueva columna **Saldo** en la tabla de letras; KPIs por saldo real.
+- ✅ **Distrito** en Registro de Compras (campo + guardado).
+
+**Verificación:** `tests/letras.test.js` ampliado (22): reversa de canje restaura F-200/F-201, saldo de letra parcial. **Suite total: 165/165.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+---
+
+## CAPTURAS ADICIONALES DEL USUARIO (2026-08-12) — referencia para próximas mejoras
+El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún:
+1. **Reporte de Cobranzas** (menú Reportes): filtros Tipo doc, Vendedor, Cliente, Cobrado hasta, Sumarizado por cliente; Excel/Reporte. → NUEVO reporte a construir.
+2. **Registro de Documento de Venta** (Factura): mucho más rico que mi Ventas actual — panel lateral **Línea de Crédito** (consumido/disponible) + lista de **Cotizaciones**; campos PLACA, VENDEDOR, OC, CORREO, COTIZACION, DATOS DE LA GUIA; atajos F1 Limpiar/F2 Agregar/F3 Nota Venta/F6 Eliminar/F7 Grabar; columna VALOR VENTA. Consulta con EST. SUNAT/CORREO SUNAT, SALDO, "FALTA APROBAR", totales soles/dólares.
+3. **Clientes**: formulario mucho más completo — Tipo (Jurídica/Natural), RUC/DNI, Nom. comercial, Distrito, Vendedor, Zona, Línea crédito + Moneda + Bloqueo crédito, Categoría, DG/DM, Retención, múltiples contactos (correos/celulares), Estado, checkbox Proveedor, Consulta RUC SUNAT.
+4. **Nota de Crédito Consulta**: columnas SUNAT (EST. SUNAT, CORREO SUNAT, ANEXO) → parte de Fase 5.
+5. Letras de Compra / CxP / NC Registro: ya replicados (confirman lo hecho).
+
+**Orden sugerido (sin backend):** (a) enriquecer **Clientes** (línea de crédito+moneda, distrito, vendedor, categoría, retención, contactos múltiples, persona natural/jurídica); (b) **Reporte de Cobranzas**; (c) enriquecer **Ventas** con panel de línea de crédito + PLACA/vendedor/OC + atajos. Las columnas EST./CORREO SUNAT son Fase 5 (electrónica).
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.

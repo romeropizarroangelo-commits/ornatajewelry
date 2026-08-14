@@ -17,6 +17,7 @@ function ok(c,m){ if(c){pass++;console.log('  ✓ '+m);} else {fail++;console.lo
 const near=(a,b)=>Math.abs(a-b)<1e-9;
 
 (function(){
+  function R2(n){ return Math.round((Number(n)||0)*100)/100; } // disponible para las funciones eval'd
   console.log('\n[1] Canje de una deuda en N letras (generarLetras)');
   eval(extractFn('addMonths')+'\n'+extractFn('generarLetras'));
 
@@ -36,11 +37,12 @@ const near=(a,b)=>Math.abs(a-b)<1e-9;
   ok(r[1].fechaVencimiento==='2027-01-15', 'el vencimiento cruza de año correctamente (dic→ene)');
 
   console.log('\n[2] Estado Vencida');
-  eval(extractFn('letraEstado'));
+  eval(extractFn('letraSaldo')+'\n'+extractFn('letraEstado'));
   const ayer='2000-01-01';
-  ok(letraEstado({estado:'Pendiente',fechaVencimiento:ayer})==='Vencida', 'pendiente con fecha pasada → Vencida');
-  ok(letraEstado({estado:'Pagada',fechaVencimiento:ayer})==='Pagada', 'pagada nunca es vencida');
-  ok(letraEstado({estado:'Pendiente',fechaVencimiento:'2999-01-01'})==='Pendiente', 'pendiente futura → Pendiente');
+  ok(letraEstado({estado:'Pendiente',monto:100,saldo:100,fechaVencimiento:ayer})==='Vencida', 'pendiente con fecha pasada → Vencida');
+  ok(letraEstado({estado:'Pagada',monto:100,saldo:0,fechaVencimiento:ayer})==='Pagada', 'pagada nunca es vencida');
+  ok(letraEstado({estado:'Pendiente',monto:100,saldo:100,fechaVencimiento:'2999-01-01'})==='Pendiente', 'pendiente futura → Pendiente');
+  ok(letraEstado({estado:'Parcial',monto:100,saldo:40,fechaVencimiento:'2999-01-01'})==='Parcial', 'con abono parcial y sin vencer → Parcial');
 
   console.log('\n[3] Canje de facturas en letras (Letras de Compra)');
   let _u=0; function uid(){ return 'u'+(++_u); }
@@ -58,6 +60,27 @@ const near=(a,b)=>Math.abs(a-b)<1e-9;
   ok(rc.letras[0].docRef==='F-100, F-101', 'la letra referencia las facturas canjeadas');
   const rc2=canjearDocs([{id:'p',num:'F-9',total:100,saldo:0,estado:'Pagada'}], ['p'], 1, '2026-09-01', {grupo:'g',base:'LC-2',tipo:'pagar',entidad:'X',hoy:'2026-08-12'});
   ok(rc2.letras.length===0, 'un documento sin saldo NO genera letras');
+
+  console.log('\n[4] Anular canje restaura las facturas (revertirCanje)');
+  eval(extractFn('estadoPorSaldo')+'\n'+extractFn('revertirCanje'));
+  var DB={ ventas:[], compras:[
+    {id:'x1', num:'F-200', total:500, saldo:500, abonado:0, estado:'Pendiente'},
+    {id:'x2', num:'F-201', total:300, saldo:300, abonado:0, estado:'Pendiente'},
+  ], letras:[] };
+  const rr=canjearDocs(DB.compras, ['x1','x2'], 3, '2026-09-01', {grupo:'gX', base:'LC-9', tipo:'pagar', entidad:'Prov', hoy:'2026-08-12'});
+  rr.letras.forEach(l=>DB.letras.push(l));
+  ok(DB.compras.every(c=>c.estado==='Canjeada') && DB.letras.length===3, 'canje: 2 facturas Canjeadas + 3 letras');
+  revertirCanje('gX');
+  ok(DB.letras.length===0, 'anular el canje elimina las 3 letras del grupo');
+  ok(DB.compras.find(c=>c.id==='x1').estado==='Pendiente' && docSaldo(DB.compras.find(c=>c.id==='x1'))===500, 'F-200 vuelve a Pendiente con saldo 500');
+  ok(DB.compras.find(c=>c.id==='x2').saldo===300, 'F-201 vuelve a saldo 300 (deuda restaurada, no se pierde)');
+
+  console.log('\n[5] Saldo de letra (pago parcial)');
+  eval(extractFn('letraSaldo'));
+  ok(letraSaldo({monto:300,saldo:300,estado:'Pendiente'})===300, 'saldo inicial = monto');
+  ok(letraSaldo({monto:300,saldo:120,estado:'Parcial'})===120, 'con abono, el saldo refleja lo que falta (120)');
+  ok(letraSaldo({monto:300,estado:'Pagada'})===0, 'pagada → saldo 0');
+  ok(letraSaldo({monto:300})===300, 'letra antigua sin campo saldo → usa el monto');
 
   console.log('\n================  RESULTADO LETRAS  ================');
   console.log(`  PASARON: ${pass}   FALLARON: ${fail}`);
