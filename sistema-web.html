@@ -1253,7 +1253,7 @@ let venta = null; // { clienteId, lines:[{prodId,cant}] }
 VIEWS.ventas=(el)=>{
   el.innerHTML=`
     <div class="page-head"><div><h1>Ventas</h1><p>Historial y registro de ventas</p></div>
-      <div class="segmented" id="segV"><button data-t="lista" class="active">Historial</button><button data-t="nueva">Nueva venta</button></div></div>
+      <div class="segmented" id="segV"><button data-t="lista" class="active">Historial</button>${pgate('ventas','registrar',`<button data-t="nueva">Nueva venta</button>`)}</div></div>
     <div id="ventaBody"></div>`;
   el.querySelectorAll('#segV button').forEach(b=>b.onclick=()=>{
     el.querySelectorAll('#segV button').forEach(x=>x.classList.remove('active'));b.classList.add('active');

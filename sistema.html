@@ -1260,7 +1260,7 @@ let venta = null; // { clienteId, lines:[{prodId,cant}] }
 VIEWS.ventas=(el)=>{
   el.innerHTML=`
     <div class="page-head"><div><h1>Ventas</h1><p>Historial y registro de ventas</p></div>
-      <div class="segmented" id="segV"><button data-t="lista" class="active">Historial</button><button data-t="nueva">Nueva venta</button></div></div>
+      <div class="segmented" id="segV"><button data-t="lista" class="active">Historial</button>${pgate('ventas','registrar',`<button data-t="nueva">Nueva venta</button>`)}</div></div>
     <div id="ventaBody"></div>`;
   el.querySelectorAll('#segV button').forEach(b=>b.onclick=()=>{
     el.querySelectorAll('#segV button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
@@ -1872,7 +1872,7 @@ function catModal(key,id){
 let compra=null;
 VIEWS.facturacompra=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Factura de Compra</h1><p>Registra compras a proveedores — suma stock automáticamente</p></div>
-    <div class="segmented" id="segC"><button data-t="lista" class="active">Historial</button><button data-t="nueva">Nueva compra</button></div></div>
+    <div class="segmented" id="segC"><button data-t="lista" class="active">Historial</button>${pgate('facturacompra','registrar',`<button data-t="nueva">Nueva compra</button>`)}</div></div>
     <div id="compraBody"></div>`;
   el.querySelectorAll('#segC button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#segC button').forEach(x=>x.classList.remove('active'));b.classList.add('active');b.dataset.t==='nueva'?renderNuevaCompra():renderCompraLista();});
   renderCompraLista();
@@ -2165,7 +2165,7 @@ function printVenta(v){
 let cotiz=null;
 VIEWS.cotizaciones=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Cotizaciones</h1><p>Genera proformas profesionales en PDF</p></div>
-    <div class="segmented" id="segCot"><button data-t="lista" class="active">Historial</button><button data-t="nueva">Nueva cotización</button></div></div>
+    <div class="segmented" id="segCot"><button data-t="lista" class="active">Historial</button>${pgate('cotizaciones','registrar',`<button data-t="nueva">Nueva cotización</button>`)}</div></div>
     <div id="cotizBody"></div>`;
   el.querySelectorAll('#segCot button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#segCot button').forEach(x=>x.classList.remove('active'));b.classList.add('active');b.dataset.t==='nueva'?renderNuevaCotiz():renderCotizLista();});
   renderCotizLista();
@@ -2180,10 +2180,10 @@ function renderCotizLista(){
       <td><div class="row-actions">
         <button class="icon-btn" title="Imprimir" data-print="${c.id}">${ICN.print}</button>
         <button class="icon-btn" title="Enviar por WhatsApp" data-wa="${c.id}" style="color:#25D366">${ICN.whatsapp}</button>
-        <button class="icon-btn" title="Editar" data-editc="${c.id}">${ICN.edit}</button>
+        ${pgate('cotizaciones','editar',`<button class="icon-btn" title="Editar" data-editc="${c.id}">${ICN.edit}</button>`)}
         ${est==='Reservada'?`<button class="icon-btn" title="Liberar reserva" data-lib="${c.id}" style="color:var(--amber)">${ICN.box}</button>`:(est!=='Facturada'?`<button class="icon-btn" title="Reservar stock" data-res="${c.id}">${ICN.box}</button>`:'')}
-        ${est!=='Facturada'?`<button class="icon-btn" title="Pasar a factura" data-tov="${c.id}">${ICN.cart}</button>`:''}
-        <button class="icon-btn del" data-del="${c.id}">${ICN.del}</button>
+        ${(est!=='Facturada' && puede('ventas','registrar'))?`<button class="icon-btn" title="Pasar a factura" data-tov="${c.id}">${ICN.cart}</button>`:''}
+        ${pgate('cotizaciones','eliminar',`<button class="icon-btn del" data-del="${c.id}">${ICN.del}</button>`)}
       </div></td></tr>`;}).join('')||emptyRow(8)}
     </tbody></table></div></div>`;
   b.querySelectorAll('[data-print]').forEach(x=>x.onclick=()=>printCotiz(DB.cotizaciones.find(c=>c.id===x.dataset.print)));
