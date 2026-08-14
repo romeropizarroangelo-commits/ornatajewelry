@@ -524,6 +524,20 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## IMPORTACIÓN POTENCIADA — Carga masiva + DUA + Factor % (2026-08-12)
+
+> Captura del usuario ("Carga Importación" del SGAE): carga desde Excel (col A=código fábrica, B=cantidad, C=FOB), NRO DUA/Fecha DUA, Factor %, pre-importación/fecha llegada, y panel "artículos con algún inconveniente".
+
+- ✅ **Carga masiva de archivo** (`loadImportFile`): acepta **CSV** (`parseImportCSV`) y **Excel .xlsx nativo** (`readXlsxImport` — lee el ZIP con `DecompressionStream('deflate-raw')`, sharedStrings + hoja, sin librerías; si el navegador no soporta o falla, avisa que lo guarden como CSV). Empareja por **código de fábrica/código/número de parte normalizado** (`matchImportRows`, ignora guiones/barras como el buscador). Los no encontrados / duplicados / cantidad inválida caen en el **panel "Artículos con algún inconveniente"** (no se cargan).
+- ✅ **Factor %** integrado a `landedCost(lineas, costos, factorPct)`: recargo estimado sobre el FOB que se prorratea junto con flete/seguro/aduana/otros (compatible: sin factor no cambia nada).
+- ✅ **Cabecera completa**: Proveedor, Número, Tipo doc, Moneda, TC, IGV, Condición, Emisión, **N° DUA + Fecha DUA**, **Factor %**, **Pre-importación**, **Fecha de llegada**. Se guardan en la importación; historial muestra N° DUA + Factor + badge Pre-import.
+
+**Verificación:** `tests/importacion.test.js` — 20/20 (prorrateo FOB; **Factor %**; parseImportCSV con encabezado/;; matchImportRows: normaliza W71275≈W712/75, por número de parte, y marca no-existe/duplicado/cantidad inválida). **Suite total: 220/220.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.

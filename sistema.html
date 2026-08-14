@@ -3245,11 +3245,12 @@ function recibirOC(id){
 
 /* ---------- IMPORTACIÓN (costo aterrizado / landed cost) ---------- */
 function convMoneda(monto, from, to, tc){ monto=Number(monto)||0; if(from===to) return monto; if(from==='$'&&to==='S/') return monto*(Number(tc)||tcActual()); if(from==='S/'&&to==='$') return monto/(Number(tc)||tcActual()); return monto; }
-// Prorratea los costos (flete+seguro+aduana+otros) entre las líneas según su valor FOB.
+// Prorratea los costos (flete+seguro+aduana+otros + Factor% sobre el FOB) entre las líneas según su valor FOB.
 // Devuelve cada línea con: importeFob, prorrateo, landedUnit (costo aterrizado unitario), landedTotal.
-function landedCost(lineas, costos){
+function landedCost(lineas, costos, factorPct){
   const fobTotal = lineas.reduce((s,l)=>s+(Number(l.fob)||0)*(Number(l.cant)||0),0);
-  const extra = (Number(costos.flete)||0)+(Number(costos.seguro)||0)+(Number(costos.aduana)||0)+(Number(costos.otros)||0);
+  const factorExtra = (Number(factorPct)||0)/100 * fobTotal;   // Factor %: recargo estimado sobre el FOB
+  const extra = (Number(costos.flete)||0)+(Number(costos.seguro)||0)+(Number(costos.aduana)||0)+(Number(costos.otros)||0) + factorExtra;
   return lineas.map(l=>{
     const cant=Number(l.cant)||0, importeFob=(Number(l.fob)||0)*cant;
     const prorrateo = fobTotal>0 ? extra*(importeFob/fobTotal) : (lineas.length?extra/lineas.length:0);
@@ -3257,6 +3258,70 @@ function landedCost(lineas, costos){
     const landedUnit = cant>0 ? landedTotal/cant : (Number(l.fob)||0);
     return Object.assign({}, l, { importeFob, prorrateo, landedTotal, landedUnit });
   });
+}
+/* Carga masiva de importación. Parseo CSV + Excel(.xlsx) nativo, y emparejado por código de fábrica. PUROS los 2 primeros. */
+function parseImportCSV(text){
+  const rows=[]; String(text||'').split(/\r?\n/).forEach((line,idx)=>{
+    if(!line.trim()) return;
+    const cells=line.split(/[,;\t]/).map(c=>c.trim().replace(/^"|"$/g,''));
+    if(idx===0 && isNaN(parseFloat(cells[2])) && isNaN(parseFloat(cells[1]))) return; // encabezado
+    if(!cells[0]) return;
+    rows.push({codfab:cells[0], cant:parseFloat(cells[1])||0, fob:parseFloat(cells[2])||0});
+  });
+  return rows;
+}
+// Empareja filas {codfab,cant,fob} con el catálogo por código de fábrica / código / número de parte (normalizado).
+function matchImportRows(rows, productos){
+  const idx={}; const K=k=>String(k||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  (productos||[]).forEach(p=>{ const add=k=>{ const kk=K(k); if(kk && !idx[kk]) idx[kk]=p; }; add(p.codFab); add(p.codigo); (p.partNumbers||[]).forEach(pn=>add(pn&&pn.numero)); });
+  const seen={}, matched=[], inconvenientes=[];
+  (rows||[]).forEach(r=>{
+    const raw=String(r.codfab||'').trim(), cant=Number(r.cant)||0, fob=Number(r.fob)||0, key=K(raw);
+    if(!raw){ inconvenientes.push({codigo:raw,cant,fob,motivo:'Código vacío'}); return; }
+    const p=idx[key];
+    if(!p){ inconvenientes.push({codigo:raw,cant,fob,motivo:'No existe en el catálogo'}); return; }
+    if(seen[key]){ inconvenientes.push({codigo:raw,cant,fob,motivo:'Duplicado en el archivo'}); return; }
+    if(cant<=0){ inconvenientes.push({codigo:raw,cant,fob,motivo:'Cantidad inválida'}); return; }
+    seen[key]=true; matched.push({prodId:p.id, codigo:p.codigo, desc:p.desc, codFab:p.codFab, cant, fob});
+  });
+  return {matched, inconvenientes};
+}
+function decodeXml(s){ return String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&'); }
+async function inflateRaw(bytes){ if(typeof DecompressionStream==='undefined') throw new Error('nozip'); const ds=new DecompressionStream('deflate-raw'); const stream=new Blob([bytes]).stream().pipeThrough(ds); return new Uint8Array(await new Response(stream).arrayBuffer()); }
+async function readXlsxImport(arrayBuffer){
+  const u8=new Uint8Array(arrayBuffer), dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength), dec=new TextDecoder();
+  let eocd=-1; for(let i=u8.length-22;i>=0 && i>=u8.length-22-65557;i--){ if(dv.getUint32(i,true)===0x06054b50){ eocd=i; break; } }
+  if(eocd<0) throw new Error('nozip');
+  const cdCount=dv.getUint16(eocd+10,true), cdOff=dv.getUint32(eocd+16,true);
+  const entries={}; let p=cdOff;
+  for(let n=0;n<cdCount;n++){ if(dv.getUint32(p,true)!==0x02014b50) break;
+    const method=dv.getUint16(p+10,true), compSize=dv.getUint32(p+20,true), nameLen=dv.getUint16(p+28,true), extraLen=dv.getUint16(p+30,true), commLen=dv.getUint16(p+32,true), lho=dv.getUint32(p+42,true);
+    const name=dec.decode(u8.subarray(p+46,p+46+nameLen)); entries[name]={method,compSize,lho}; p+=46+nameLen+extraLen+commLen; }
+  const readEntry=async(e)=>{ const nl=dv.getUint16(e.lho+26,true), xl=dv.getUint16(e.lho+28,true), ds=e.lho+30+nl+xl; const comp=u8.subarray(ds,ds+e.compSize); return e.method===0?comp:await inflateRaw(comp); };
+  let shared=[]; const ssName=Object.keys(entries).find(k=>/sharedStrings\.xml$/i.test(k));
+  if(ssName){ const xml=dec.decode(await readEntry(entries[ssName])); shared=[...xml.matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m=>decodeXml([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join(''))); }
+  const sheetName=Object.keys(entries).filter(k=>/xl\/worksheets\/sheet\d+\.xml$/i.test(k)).sort()[0]; if(!sheetName) throw new Error('nosheet');
+  const sheetXml=dec.decode(await readEntry(entries[sheetName])); const rows=[];
+  [...sheetXml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)].forEach(rm=>{ const cm={};
+    [...rm[1].matchAll(/<c r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g)].forEach(c=>{ const col=c[1], isStr=/t="s"/.test(c[2]), vm=c[3].match(/<v>([\s\S]*?)<\/v>/); let val=vm?vm[1]:''; if(isStr) val=shared[parseInt(val,10)]||''; else { const im=c[3].match(/<t[^>]*>([\s\S]*?)<\/t>/); if(im) val=decodeXml(im[1]); } cm[col]=val; });
+    rows.push({codfab:cm['A']||'', cant:cm['B']||'', fob:cm['C']||''}); });
+  if(rows.length && isNaN(parseFloat(rows[0].fob)) && isNaN(parseFloat(rows[0].cant))) rows.shift();
+  return rows.filter(r=>String(r.codfab).trim()).map(r=>({codfab:String(r.codfab).trim(), cant:parseFloat(r.cant)||0, fob:parseFloat(r.fob)||0}));
+}
+async function loadImportFile(file){
+  if(!file || !imp) return;
+  try{
+    const rows = /\.csv$/i.test(file.name) ? parseImportCSV(await file.text()) : await readXlsxImport(await file.arrayBuffer());
+    if(!rows.length){ toast('El archivo no tiene filas válidas','error'); return; }
+    const res=matchImportRows(rows, DB.productos);
+    res.matched.forEach(m=>{ const ex=imp.lines.find(l=>l.prodId===m.prodId); if(ex){ ex.cant+=m.cant; if(m.fob) ex.fob=m.fob; } else imp.lines.push({prodId:m.prodId, cant:m.cant, fob:m.fob}); });
+    imp.inconvenientes=res.inconvenientes; drawImp();
+    toast(res.matched.length+' producto(s) cargado(s)'+(res.inconvenientes.length?' · '+res.inconvenientes.length+' con inconveniente':''), res.inconvenientes.length?'error':'success');
+  }catch(e){
+    const m=String(e&&e.message);
+    if(m==='nozip'||m==='nosheet') toast('No pude leer ese Excel. Guárdalo como CSV (columnas: código de fábrica, cantidad, FOB) e inténtalo.','error');
+    else toast('No se pudo leer el archivo','error');
+  }
 }
 let imp=null;
 VIEWS.importacion=(el)=>{
@@ -3269,22 +3334,57 @@ VIEWS.importacion=(el)=>{
 function renderImpLista(){
   const b=document.getElementById('impBody');
   b.innerHTML=`<div class="card"><div class="section-title">Importaciones</div><div class="table-wrap">
-    <table><thead><tr><th>Número</th><th>Proveedor</th><th>Fecha</th><th style="text-align:center">Ítems</th><th>Estado</th><th style="text-align:right">Costo total</th><th></th></tr></thead><tbody>
-    ${DB.importaciones.map(o=>`<tr><td class="cell-mono cell-strong">${o.num}</td><td class="cell-strong">${o.proveedor}</td><td>${fmtDate(o.fecha)}</td><td style="text-align:center">${o.items}</td><td>${o.estado==='Recibida'?'<span class="badge badge-green">Recibida</span>':'<span class="badge badge-amber">En tránsito</span>'}</td><td style="text-align:right" class="cell-strong">${money2(o.totalLanded,o.moneda)}</td>
-      <td><div class="row-actions">${o.estado!=='Recibida'?`<button class="btn btn-primary btn-sm" data-recibir="${o.id}">${ICN.check} Recibir</button>`:''}<button class="icon-btn del" data-del="${o.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(7)}
+    <table><thead><tr><th>Número</th><th>Proveedor</th><th>N° DUA</th><th>Fecha</th><th style="text-align:center">Ítems</th><th style="text-align:center">Factor</th><th>Estado</th><th style="text-align:right">Costo total</th><th></th></tr></thead><tbody>
+    ${DB.importaciones.map(o=>`<tr><td class="cell-mono cell-strong">${o.num}</td><td class="cell-strong">${o.proveedor}</td><td class="cell-mono">${o.nroDua||'—'}</td><td>${fmtDate(o.fecha)}</td><td style="text-align:center">${o.items}</td><td style="text-align:center">${Number(o.factor)?o.factor+'%':'—'}</td><td>${o.estado==='Recibida'?'<span class="badge badge-green">Recibida</span>':(o.preimportacion?'<span class="badge badge-gray">Pre-import.</span>':'<span class="badge badge-amber">En tránsito</span>')}</td><td style="text-align:right" class="cell-strong">${money2(o.totalLanded,o.moneda)}</td>
+      <td><div class="row-actions">${o.estado!=='Recibida'?`<button class="btn btn-primary btn-sm" data-recibir="${o.id}">${ICN.check} Recibir</button>`:''}<button class="icon-btn del" data-del="${o.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(9)}
     </tbody></table></div></div>`;
   b.querySelectorAll('[data-recibir]').forEach(x=>x.onclick=()=>recibirImp(x.dataset.recibir));
   b.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>confirmDialog('¿Eliminar importación?','',()=>{DB.importaciones=DB.importaciones.filter(o=>o.id!==x.dataset.del);save();renderImpLista();toast('Importación eliminada','success');}));
 }
-function renderNuevaImp(){ imp={proveedor:DB.proveedores[0]?.nombre||'', moneda:'$', tc:tcActual(), lines:[], costos:{flete:0,seguro:0,aduana:0,otros:0}}; drawImp(); }
+function renderNuevaImp(){
+  const hoy=new Date().toISOString().slice(0,10);
+  imp={ proveedor:DB.proveedores[0]?.nombre||'', moneda:'$', tc:tcActual(), lines:[], costos:{flete:0,seguro:0,aduana:0,otros:0},
+    numero:'', tipoDoc:'Factura', emision:hoy, condicion:'Contado', igv:0.18, nroDua:'', fechaDua:hoy, factor:0, preimportacion:false, fechaLlegada:hoy, inconvenientes:[] };
+  drawImp();
+}
 function drawImp(){
   const b=document.getElementById('impBody');
-  const calc=landedCost(imp.lines.map(l=>({fob:l.fob,cant:l.cant})), imp.costos);
+  const calc=landedCost(imp.lines.map(l=>({fob:l.fob,cant:l.cant})), imp.costos, imp.factor);
   const fobTotal=calc.reduce((s,l)=>s+l.importeFob,0);
-  const extra=(Number(imp.costos.flete)||0)+(Number(imp.costos.seguro)||0)+(Number(imp.costos.aduana)||0)+(Number(imp.costos.otros)||0);
+  const costosSum=(Number(imp.costos.flete)||0)+(Number(imp.costos.seguro)||0)+(Number(imp.costos.aduana)||0)+(Number(imp.costos.otros)||0);
+  const factorExtra=(Number(imp.factor)||0)/100*fobTotal;
+  const extra=costosSum+factorExtra;
   const totalLanded=fobTotal+extra;
   const sym=imp.moneda;
-  b.innerHTML=`<div class="venta-layout">
+  const inc=imp.inconvenientes||[];
+  b.innerHTML=`
+    <div class="card" style="margin-bottom:18px"><div class="section-title">Datos de importación</div>
+      <div class="form-grid" style="padding:16px">
+        <div class="field"><label>Proveedor</label><select id="impProv">${DB.proveedores.map(p=>`<option ${imp.proveedor===p.nombre?'selected':''}>${p.nombre}</option>`).join('')||'<option value="">(sin proveedores)</option>'}</select></div>
+        <div class="field"><label>Número</label><input id="imp_numero" value="${imp.numero||''}" placeholder="N° factura"></div>
+        <div class="field"><label>Tipo doc.</label><select id="imp_tipoDoc"><option ${imp.tipoDoc==='Factura'?'selected':''}>Factura</option><option ${imp.tipoDoc==='Boleta'?'selected':''}>Boleta</option><option ${imp.tipoDoc==='Invoice'?'selected':''}>Invoice</option></select></div>
+        <div class="field"><label>Moneda</label><select id="impMon"><option value="$" ${imp.moneda==='$'?'selected':''}>Dólares</option><option value="S/" ${imp.moneda==='S/'?'selected':''}>Soles</option></select></div>
+        <div class="field"><label>Tipo de cambio</label><input id="impTC" type="number" step="0.001" value="${imp.tc}"></div>
+        <div class="field"><label>IGV %</label><select id="imp_igv"><option value="0.18" ${Number(imp.igv)===0.18?'selected':''}>18%</option><option value="0" ${Number(imp.igv)===0?'selected':''}>0%</option></select></div>
+        <div class="field"><label>Condición pago</label><select id="imp_condicion"><option ${imp.condicion==='Contado'?'selected':''}>Contado</option><option ${imp.condicion==='Crédito'?'selected':''}>Crédito</option></select></div>
+        <div class="field"><label>Emisión</label><input type="date" id="imp_emision" value="${imp.emision}"></div>
+        <div class="field"><label>N° DUA</label><input id="imp_nroDua" value="${imp.nroDua||''}" placeholder="Declaración de Aduanas"></div>
+        <div class="field"><label>Fecha DUA</label><input type="date" id="imp_fechaDua" value="${imp.fechaDua}"></div>
+        <div class="field"><label>Factor % (recargo s/ FOB)</label><input id="imp_factor" type="number" step="0.01" value="${imp.factor||0}"></div>
+        <div class="field"><label>Fecha de llegada</label><input type="date" id="imp_fechaLlegada" value="${imp.fechaLlegada}"></div>
+        <div class="field"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer"><input type="checkbox" id="imp_pre" ${imp.preimportacion?'checked':''}> Pre-importación</label></div>
+      </div>
+      <div style="padding:0 16px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:14px">
+        <button class="btn btn-primary" id="impCargar">${ICN.upload} Cargar archivo (Excel/CSV)</button>
+        <input type="file" id="impFile" accept=".csv,.xlsx" style="display:none">
+        <span style="color:var(--ink-3);font-size:12px">Columnas: <b>A = Código de fábrica</b>, <b>B = Cantidad</b>, <b>C = FOB</b>. (Si es Excel, guárdalo con esas 3 columnas; si falla, expórtalo como CSV.)</span>
+      </div>
+    </div>
+    ${inc.length?`<div class="card" style="margin-bottom:18px;border:1px solid var(--red)"><div class="section-title" style="color:var(--red)">Artículos con algún inconveniente (${inc.length}) — no se cargaron</div><div class="table-wrap">
+      <table><thead><tr><th>Código de fábrica</th><th style="text-align:center">Cant.</th><th style="text-align:right">FOB</th><th>Motivo</th></tr></thead><tbody>
+      ${inc.map(x=>`<tr><td class="cell-mono cell-strong">${x.codigo||'—'}</td><td style="text-align:center">${x.cant||''}</td><td style="text-align:right">${Number(x.fob||0).toFixed(2)}</td><td style="color:var(--red)">${x.motivo}</td></tr>`).join('')}
+      </tbody></table></div></div>`:''}
+    <div class="venta-layout">
     <div class="card"><div class="section-title">Productos importados (FOB)</div>
       <div style="padding:16px"><div class="line-add"><select class="filter-select" id="selProdImp" style="flex:1"><option value="">+ Agregar producto...</option>${DB.productos.slice(0,800).map(p=>`<option value="${p.id}">${p.codigo} · ${p.desc}</option>`).join('')}</select></div></div>
       <div class="table-wrap"><table><thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">FOB unit.</th><th style="text-align:right">Aterrizado unit.</th><th></th></tr></thead><tbody>
@@ -3295,12 +3395,7 @@ function drawImp(){
         <td><div class="row-actions"><button class="icon-btn del" data-imprm="${i}">${ICN.del}</button></div></td></tr>`;}).join(''):`<tr><td colspan="5" class="empty" style="padding:40px">${ICN.box}<h3>Sin productos</h3><p>Agrega los productos que importas con su costo FOB.</p></td></tr>`}
       </tbody></table></div></div>
     <div class="card cart-summary">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-        <div class="field"><label>Moneda</label><select id="impMon"><option value="$" ${imp.moneda==='$'?'selected':''}>Dólares</option><option value="S/" ${imp.moneda==='S/'?'selected':''}>Soles</option></select></div>
-        <div class="field"><label>T.C.</label><input id="impTC" type="number" step="0.001" value="${imp.tc}"/></div>
-      </div>
-      <div class="field" style="margin-bottom:12px"><label>Proveedor</label><select id="impProv">${DB.proveedores.map(p=>`<option ${imp.proveedor===p.nombre?'selected':''}>${p.nombre}</option>`).join('')}</select></div>
-      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-2);margin:6px 0 10px">Costos de importación (${sym})</div>
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-2);margin:2px 0 10px">Costos de importación (${sym})</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div class="field"><label>Flete</label><input id="imp_flete" type="number" step="0.01" value="${imp.costos.flete||''}"/></div>
         <div class="field"><label>Seguro</label><input id="imp_seguro" type="number" step="0.01" value="${imp.costos.seguro||''}"/></div>
@@ -3308,15 +3403,29 @@ function drawImp(){
         <div class="field"><label>Otros</label><input id="imp_otros" type="number" step="0.01" value="${imp.costos.otros||''}"/></div>
       </div>
       <div class="summ-row"><span>FOB total</span><span>${money2(fobTotal,sym)}</span></div>
-      <div class="summ-row"><span>+ Costos</span><span>${money2(extra,sym)}</span></div>
+      <div class="summ-row"><span>+ Costos (flete/seguro/aduana/otros)</span><span>${money2(costosSum,sym)}</span></div>
+      ${Number(imp.factor)?`<div class="summ-row"><span>+ Factor ${imp.factor}% s/ FOB</span><span>${money2(factorExtra,sym)}</span></div>`:''}
       <div class="summ-row total"><span>Costo aterrizado</span><span>${money2(totalLanded,sym)}</span></div>
       <button class="btn btn-primary" id="emitImp" style="width:100%;justify-content:center;margin-top:18px" ${imp.lines.length?'':'disabled'}>${ICN.check} Grabar importación</button>
     </div></div>`;
-  document.getElementById('selProdImp').onchange=(e)=>{if(e.target.value){const p=DB.productos.find(x=>x.id===e.target.value);const ex=imp.lines.find(l=>l.prodId===e.target.value);if(ex)ex.cant++;else imp.lines.push({prodId:e.target.value,cant:1,fob:Number(p.costo)||0});drawImp();}};
-  document.getElementById('impMon').onchange=(e)=>{imp.moneda=e.target.value;drawImp();};
-  document.getElementById('impTC').onchange=(e)=>{imp.tc=parseFloat(e.target.value)||1;drawImp();};
-  document.getElementById('impProv').onchange=(e)=>imp.proveedor=e.target.value;
-  ['flete','seguro','aduana','otros'].forEach(k=>{ document.getElementById('imp_'+k).onchange=(e)=>{imp.costos[k]=parseFloat(e.target.value)||0;drawImp();}; });
+  const set=(id,ev,fn)=>{const e=document.getElementById(id);if(e)e[ev]=fn;};
+  set('selProdImp','onchange',(e)=>{if(e.target.value){const p=DB.productos.find(x=>x.id===e.target.value);const ex=imp.lines.find(l=>l.prodId===e.target.value);if(ex)ex.cant++;else imp.lines.push({prodId:e.target.value,cant:1,fob:Number(p.costo)||0});drawImp();}});
+  set('impMon','onchange',(e)=>{imp.moneda=e.target.value;drawImp();});
+  set('impTC','onchange',(e)=>{imp.tc=parseFloat(e.target.value)||1;drawImp();});
+  set('impProv','onchange',(e)=>{imp.proveedor=e.target.value;});
+  set('imp_numero','onchange',(e)=>{imp.numero=e.target.value.trim();});
+  set('imp_tipoDoc','onchange',(e)=>{imp.tipoDoc=e.target.value;});
+  set('imp_igv','onchange',(e)=>{imp.igv=Number(e.target.value);});
+  set('imp_condicion','onchange',(e)=>{imp.condicion=e.target.value;});
+  set('imp_emision','onchange',(e)=>{imp.emision=e.target.value;});
+  set('imp_nroDua','onchange',(e)=>{imp.nroDua=e.target.value.trim();});
+  set('imp_fechaDua','onchange',(e)=>{imp.fechaDua=e.target.value;});
+  set('imp_factor','onchange',(e)=>{imp.factor=parseFloat(e.target.value)||0;drawImp();});
+  set('imp_fechaLlegada','onchange',(e)=>{imp.fechaLlegada=e.target.value;});
+  set('imp_pre','onchange',(e)=>{imp.preimportacion=e.target.checked;});
+  set('impCargar','onclick',()=>{ const f=document.getElementById('impFile'); if(f) f.click(); });
+  set('impFile','onchange',(e)=>loadImportFile(e.target.files&&e.target.files[0]));
+  ['flete','seguro','aduana','otros'].forEach(k=>{ set('imp_'+k,'onchange',(e)=>{imp.costos[k]=parseFloat(e.target.value)||0;drawImp();}); });
   b.querySelectorAll('[data-impq]').forEach(inp=>inp.onchange=()=>{let v=parseInt(inp.value)||1;if(v<1)v=1;imp.lines[inp.dataset.impq].cant=v;drawImp();});
   b.querySelectorAll('[data-impf]').forEach(inp=>inp.onchange=()=>{imp.lines[inp.dataset.impf].fob=parseFloat(inp.value)||0;drawImp();});
   b.querySelectorAll('[data-imprm]').forEach(x=>x.onclick=()=>{imp.lines.splice(x.dataset.imprm,1);drawImp();});
@@ -3324,11 +3433,11 @@ function drawImp(){
 }
 async function grabarImp(){
   if(emitLock) return; emitLock=true; const btn=document.getElementById('emitImp'); if(btn)btn.disabled=true;
-  const calc=landedCost(imp.lines.map(l=>({fob:l.fob,cant:l.cant})), imp.costos);
+  const calc=landedCost(imp.lines.map(l=>({fob:l.fob,cant:l.cant})), imp.costos, imp.factor);
   const totalLanded=calc.reduce((s,l)=>s+l.landedTotal,0);
   const num='IMP-'+String(1000+DB.importaciones.length+1);
   const lineas=imp.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId);return {prodId:l.prodId,codigo:p.codigo,desc:p.desc,cant:l.cant,fob:l.fob,landedUnit:calc[i].landedUnit};});
-  DB.importaciones.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:imp.proveedor,moneda:imp.moneda,tc:imp.tc,costos:Object.assign({},imp.costos),items:imp.lines.reduce((s,l)=>s+l.cant,0),totalLanded,estado:'En tránsito',usuario:usuarioActual(),creado:new Date().toISOString(),lineas});
+  DB.importaciones.unshift({id:uid(),num,fecha:imp.emision||new Date().toISOString().slice(0,10),proveedor:imp.proveedor,moneda:imp.moneda,tc:imp.tc,costos:Object.assign({},imp.costos),factor:imp.factor,numProv:imp.numero,tipoDoc:imp.tipoDoc,nroDua:imp.nroDua,fechaDua:imp.fechaDua,igv:imp.igv,condicion:imp.condicion,preimportacion:imp.preimportacion,fechaLlegada:imp.fechaLlegada,items:imp.lines.reduce((s,l)=>s+l.cant,0),totalLanded,estado:'En tránsito',usuario:usuarioActual(),creado:new Date().toISOString(),lineas});
   try{await persist();}catch(e){emitLock=false;if(btn)btn.disabled=false;toast('No se pudo guardar','error');return;}
   toast('Importación '+num+' grabada','success'); emitLock=false;
   document.querySelector('#segImp button[data-t="lista"]').click();
