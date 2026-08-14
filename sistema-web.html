@@ -1272,13 +1272,14 @@ function renderVentaLista(){
       ${kpiCard('check','var(--brand)','var(--brand-soft)','Pagadas',DB.ventas.filter(v=>v.estado==='Pagada').length,'documentos',null)}
     </div>
     <div class="card"><div class="section-title">Documentos</div><div class="table-wrap">
-      <table><thead><tr><th>Documento</th><th>Cliente</th><th>Fecha</th><th style="text-align:center">Ítems</th><th>Método</th><th>Estado</th><th style="text-align:right">Total</th><th></th></tr></thead><tbody>
+      <table><thead><tr><th>Documento</th><th>Cliente</th><th>Fecha</th><th style="text-align:center">Ítems</th><th>Método</th><th>Estado</th><th style="text-align:right">Total</th><th style="text-align:right">Saldo</th><th></th></tr></thead><tbody>
       ${DB.ventas.map(v=>`<tr>
         <td class="cell-mono cell-strong">${v.num}</td><td class="cell-strong">${v.cliente}</td><td>${fmtDate(v.fecha)}</td>
         <td style="text-align:center">${v.items}</td><td><span class="badge badge-gray">${v.metodo||'Contado'}</span></td>
         <td>${estadoBadge(v.estado)}</td><td style="text-align:right" class="cell-strong">${money(v.total)}</td>
+        <td style="text-align:right" class="cell-mono">${docSaldo(v)>0.005?money(docSaldo(v)):'<span style="color:var(--green)">—</span>'}</td>
         <td><div class="row-actions"><button class="icon-btn" title="Imprimir" data-print="${v.id}">${ICN.print}</button>${v.estado==='Pendiente'?`<button class="icon-btn" title="Marcar pagada" data-pay="${v.id}">${ICN.check}</button>`:''}<button class="icon-btn del" data-del="${v.id}">${ICN.del}</button></div></td>
-      </tr>`).join('')||emptyRow(8)}
+      </tr>`).join('')||emptyRow(9)}
       </tbody></table></div></div>`;
   b.querySelectorAll('[data-print]').forEach(x=>x.onclick=()=>printVenta(DB.ventas.find(v=>v.id===x.dataset.print)));
   b.querySelectorAll('[data-pay]').forEach(x=>x.onclick=()=>{DB.ventas.find(v=>v.id===x.dataset.pay).estado='Pagada';save();renderVentaLista();toast('Venta marcada como pagada','success');});
@@ -1297,8 +1298,25 @@ function renderVentaLista(){
   });
 }
 function renderNuevaVenta(){
-  venta={ tipo:'Factura', clienteId: DB.clientes[0]?.id||null, lines:[], metodo:'Contado', tc:tcActual(), search:'', fromCotiz:'' };
+  const c0=DB.clientes[0];
+  venta={ tipo:'Factura', clienteId: c0?.id||null, lines:[], metodo:'Contado', tc:tcActual(), search:'', fromCotiz:'',
+    placa:'', vendedor:(c0&&c0.vendedor)||usuarioNombre(), oc:'', nota:'', correo:(c0&&c0.correo1)||'' };
   drawVenta();
+}
+function usuarioNombre(){ const u=(DB.usuarios||[]).find(x=>x.usuario===usuarioActual()); return u?u.nombre:(usuarioActual()||''); }
+// Panel de línea de crédito del cliente (como en el SGAE): línea / consumido / disponible + aviso.
+function creditPanel(clienteId, totalVenta, metodo){
+  const c=DB.clientes.find(x=>x.id===clienteId); if(!c) return '';
+  const mon=c.monedaCredito||'S/', linea=Number(c.credito)||0, consumido=deudaCliente(clienteId), disp=linea-consumido;
+  const fmt=n=>mon+' '+(Number(n)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  let warn='';
+  if(metodo==='Crédito'){ const chk=chequeoCredito(clienteId,totalVenta); if(!chk.ok) warn=`<div style="margin-top:8px;padding:8px 10px;background:var(--red-soft);color:var(--red);border-radius:8px;font-size:11.5px;font-weight:600">${chk.msg}</div>`; }
+  return `<div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px;background:var(--surface-2)">
+    <div style="font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-3);font-weight:800;margin-bottom:8px">Línea de crédito${c.bloqueoCredito?' <span style="color:var(--red)">· BLOQUEADA</span>':''}</div>
+    <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0"><span style="color:var(--ink-2)">Línea</span><span class="cell-strong">${linea>0?fmt(linea):'Contado'}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0"><span style="color:var(--ink-2)">Consumido</span><span class="cell-strong" style="color:var(--amber)">${fmt(consumido)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0"><span style="color:var(--ink-2)">Disponible</span><span class="cell-strong" style="color:${disp>0?'var(--green)':'var(--red)'}">${fmt(disp)}</span></div>
+    ${warn}</div>`;
 }
 // Niveles de precio: mostrador (base) / taller / flota. El cliente tiene un nivel asignado.
 const NIVELES = { mostrador:'Mostrador', mayor:'Por Mayor', taller:'Taller', flota:'Flota' };
@@ -1326,6 +1344,12 @@ function drawVenta(){
   const igv=base*0.18, total=base+igv;
   const q=(venta.search||'').toLowerCase().trim();
   const results = buscarProductos(venta.search, 8);
+  const cotsCli = DB.cotizaciones.filter(c=>c.clienteId===venta.clienteId && c.estado!=='Facturada');
+  const vendList = [...new Set([...(DB.usuarios||[]).map(u=>u.nombre), venta.vendedor].filter(Boolean))];
+  const cotsClienteHTML = cotsCli.length ? `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:14px">
+      <div style="font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-3);font-weight:800;margin-bottom:6px">Cotizaciones del cliente</div>
+      ${cotsCli.slice(0,6).map(c=>`<div data-loadcot="${c.id}" style="display:flex;justify-content:space-between;padding:5px 2px;cursor:pointer;border-bottom:1px solid var(--line)"><span class="cell-mono cell-strong">${c.num}</span><span class="cell-mono" style="color:var(--ink-3)">${money2(c.total,c.moneda)} →</span></div>`).join('')}
+    </div>` : '';
   b.innerHTML=`<div class="venta-layout">
     <div class="card">
       <div style="padding:16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
@@ -1359,11 +1383,21 @@ function drawVenta(){
       </div>
       <div class="field" style="margin-bottom:12px"><label>Cliente · <span style="color:var(--brand)">precio ${NIVELES[clienteNivel(venta.clienteId)]}</span></label>
         <select id="ventaCli">${DB.clientes.map(c=>`<option value="${c.id}" ${venta.clienteId===c.id?'selected':''}>${c.nombre}</option>`).join('')}</select></div>
-      <div class="field" style="margin-bottom:16px"><label>Tipo de cambio (US$ → S/)</label><input id="ventaTC" type="number" step="0.001" value="${venta.tc}"/></div>
+      ${creditPanel(venta.clienteId, total, venta.metodo)}
+      ${cotsClienteHTML}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="field"><label>Vendedor</label><select id="ventaVend"><option value="">—</option>${vendList.map(v=>`<option ${venta.vendedor===v?'selected':''}>${v}</option>`).join('')}</select></div>
+        <div class="field"><label>Placa</label><input id="ventaPlaca" value="${venta.placa||''}" placeholder="—"/></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="field"><label>Orden de compra</label><input id="ventaOC" value="${venta.oc||''}" placeholder="OC del cliente"/></div>
+        <div class="field"><label>Tipo de cambio</label><input id="ventaTC" type="number" step="0.001" value="${venta.tc}"/></div>
+      </div>
+      <div class="field" style="margin-bottom:16px"><label>Nota / observación</label><input id="ventaNota" value="${venta.nota||''}" placeholder="Opcional"/></div>
       <div class="summ-row"><span>Base imponible</span><span>${money(base)}</span></div>
       <div class="summ-row"><span>IGV (18%)</span><span>${money(igv)}</span></div>
       <div class="summ-row total"><span>Total</span><span>${money(total)}</span></div>
-      <button class="btn btn-primary" id="emitBtn" style="width:100%;justify-content:center;margin-top:18px" ${venta.lines.length?'':'disabled'}>${ICN.check} Emitir ${venta.tipo.toLowerCase()}</button>
+      <button class="btn btn-primary" id="emitBtn" style="width:100%;justify-content:center;margin-top:18px" ${venta.lines.length?'':'disabled'}>${ICN.check} Emitir ${venta.tipo.toLowerCase()} (F7)</button>
     </div>
   </div>`;
   document.getElementById('ventaCargarCot').onclick=()=>{ const sel=document.getElementById('ventaCotiz').value; if(sel) loadCotizIntoVenta(sel); else toast('Elige una cotización','error'); };
@@ -1378,9 +1412,15 @@ function drawVenta(){
   };
   b.querySelectorAll('[data-add]').forEach(r=>r.onclick=()=>{ const id=r.dataset.add; const ex=venta.lines.find(l=>l.prodId===id); if(ex)ex.cant++; else {const p=DB.productos.find(x=>x.id===id);venta.lines.push({prodId:id,cant:1,valor:ventaPrecioSoles(p),edited:false});} venta.search=''; drawVenta(); });
   document.getElementById('ventaTipo').onchange=(e)=>{venta.tipo=e.target.value;drawVenta();};
-  document.getElementById('ventaCli').onchange=(e)=>{ venta.clienteId=e.target.value; drawVenta(); };
-  document.getElementById('ventaMet').onchange=(e)=>venta.metodo=e.target.value;
+  document.getElementById('ventaCli').onchange=(e)=>{ venta.clienteId=e.target.value; const c=DB.clientes.find(x=>x.id===venta.clienteId); if(c){ if(c.vendedor) venta.vendedor=c.vendedor; if(c.correo1) venta.correo=c.correo1; } drawVenta(); };
+  document.getElementById('ventaMet').onchange=(e)=>{venta.metodo=e.target.value;drawVenta();};
   document.getElementById('ventaTC').onchange=(e)=>{ venta.tc=parseFloat(e.target.value)||1; drawVenta(); };
+  const setV=(id,ev,fn)=>{const e=document.getElementById(id);if(e)e[ev]=fn;};
+  setV('ventaVend','onchange',e=>{venta.vendedor=e.target.value;});
+  setV('ventaPlaca','onchange',e=>{venta.placa=e.target.value.trim();});
+  setV('ventaOC','onchange',e=>{venta.oc=e.target.value.trim();});
+  setV('ventaNota','onchange',e=>{venta.nota=e.target.value.trim();});
+  b.querySelectorAll('[data-loadcot]').forEach(x=>x.onclick=()=>loadCotizIntoVenta(x.dataset.loadcot));
   b.querySelectorAll('[data-qty]').forEach(inp=>inp.onchange=()=>{let v=parseInt(inp.value)||1;if(v<1)v=1;venta.lines[inp.dataset.qty].cant=v;drawVenta();});
   b.querySelectorAll('[data-val]').forEach(inp=>inp.onchange=()=>{venta.lines[inp.dataset.val].valor=parseFloat(inp.value)||0;venta.lines[inp.dataset.val].edited=true;drawVenta();});
   b.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{venta.lines.splice(x.dataset.rm,1);drawVenta();});
@@ -1447,7 +1487,7 @@ async function emitirVenta(){
     await commit(()=>{
       num = nextNumero(venta.tipo==='Boleta'?'BOLETA':'FACTURA');
       venta.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);deductStock(p,l.cant);recordMov(p,'VENTA',num,-l.cant,{razon:(cli?cli.nombre:'Cliente varios'),precio:Number(l.precio)||0,tc:venta.tc,moneda:venta.moneda||'S/'});});
-      DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:venta.clienteId, cliente:cli?cli.nombre:'Cliente varios', items:venta.lines.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:venta.metodo==='Crédito'?'Pendiente':'Pagada', saldo:(venta.metodo==='Crédito'?total:0), abonado:(venta.metodo==='Crédito'?0:total), metodo:venta.metodo, tc:venta.tc, referencia:venta.fromCotiz||'', usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
+      DB.ventas.unshift({ id:uid(), num, fecha:new Date().toISOString().slice(0,10), clienteId:venta.clienteId, cliente:cli?cli.nombre:'Cliente varios', items:venta.lines.reduce((s,l)=>s+l.cant,0), subtotal:base, igv, total, estado:venta.metodo==='Crédito'?'Pendiente':'Pagada', saldo:(venta.metodo==='Crédito'?total:0), abonado:(venta.metodo==='Crédito'?0:total), metodo:venta.metodo, tc:venta.tc, referencia:venta.fromCotiz||'', vendedor:venta.vendedor||'', placa:venta.placa||'', oc:venta.oc||'', nota:venta.nota||'', correo:venta.correo||'', usuario:usuarioActual(), creado:new Date().toISOString(), lineas });
     });
   } catch(e){
     emitLock=false; if(btn) btn.disabled=false;

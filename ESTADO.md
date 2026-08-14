@@ -465,6 +465,24 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## VENTAS ENRIQUECIDA — Registro de Documento de Venta (2026-08-12)
+
+> Réplica potenciada de la pantalla de Ventas del SGAE (panel de línea de crédito + cotizaciones al lado + placa/vendedor/OC + atajos).
+
+- ✅ **Panel de Línea de Crédito** (`creditPanel`): en el resumen de la venta muestra Línea / **Consumido** (`deudaCliente`) / **Disponible** del cliente en su moneda, y si es a Crédito y excede/está bloqueado, **muestra el aviso en vivo** (mismo `chequeoCredito`).
+- ✅ **Cotizaciones del cliente**: lista clicable en el panel (las no facturadas del cliente) → carga la cotización a la venta con un clic (además del selector existente).
+- ✅ **Campos nuevos**: Vendedor (de usuarios; por defecto el del cliente), **Placa**, Orden de compra, Nota/observación, correo (del cliente). Se **guardan en la venta**. Al cambiar de cliente, autocompleta vendedor y correo.
+- ✅ **Atajos** F1 (Limpiar/nueva) y **F7 (Grabar)** en la venta, integrados en el handler global (junto a los F1/F4/F6 de compras y F2/Ctrl+S existentes).
+- ✅ **Historial** con nueva columna **Saldo** (usa `docSaldo`): se ve de un vistazo cuánto falta cobrar por documento.
+
+**Verificación:** UI sobre lógica ya testeada (crédito/`docSaldo`). **Suite total: 172/172.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+**Quedan de las capturas:** **Perfiles granular** (permisos por usuario/página/acción) — el más grande, sin backend. Las columnas EST./Correo SUNAT (consultas de venta/NC) son Fase 5 (electrónica, exige servidor).
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.
