@@ -720,6 +720,8 @@ const MENU = [
     { id:'repventasnetas', label:'Ventas Netas' },
     { id:'repranking', label:'Ranking de Ventas' },
     { id:'repvendedor', label:'Ventas por Vendedor' },
+    { id:'repcobranzas', label:'Reporte de Cobranzas' },
+    { id:'reppagos', label:'Reporte de Pagos', adminOnly:true },
     { id:'repinvvalorizado', label:'Inventario Valorizado' },
     { id:'repstockmuerto', label:'Stock Muerto' },
     { id:'repmovimientos', label:'Movimientos de Productos' },
@@ -763,7 +765,7 @@ function renderNav(){
   nav.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k=b.dataset.toggle; navExpanded[k]=!(navExpanded[k]||MENU.find(m=>m.key===k).children.some(c=>c.id===currentView)); renderNav(); });
 }
 
-const ADMIN_VIEWS = new Set(['configuracion','perfiles','repmargen','cierremensual','unioncodigo','empresas']);
+const ADMIN_VIEWS = new Set(['configuracion','perfiles','repmargen','cierremensual','unioncodigo','empresas','reppagos']);
 function go(view){
   if(ADMIN_VIEWS.has(view) && !esAdmin()){ toast('Solo el administrador puede acceder','error'); view='dashboard'; }
   currentView = view;
@@ -1537,6 +1539,24 @@ function revertirAbonos(docs, aplicaciones){
 }
 function totalPorCobrar(){ return R2(DB.ventas.reduce((s,v)=>s+docSaldo(v),0)); }
 function totalPorPagar(){ return R2(DB.compras.reduce((s,c)=>s+docSaldo(c),0)); }
+
+/* Reporte de cobranzas/pagos (PURO/testeable). Filtra recibos (excluye anulados) por
+   entidad, medio, y rango de fechas; devuelve la lista y el total. */
+function filtrarRecibos(recibos, f){
+  f=f||{};
+  let list=(recibos||[]).filter(r=>r.estado!=='Anulado');
+  if(f.entidad) list=list.filter(r=>r.entidad===f.entidad);
+  if(f.medio) list=list.filter(r=>r.medio===f.medio);
+  if(f.desde) list=list.filter(r=>String(r.fecha||'')>=f.desde);
+  if(f.hasta) list=list.filter(r=>String(r.fecha||'')<=f.hasta);
+  list=list.slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+  return { list, total:R2(list.reduce((s,r)=>s+Number(r.total||0),0)) };
+}
+function sumarizarRecibos(list){
+  const m={};
+  (list||[]).forEach(r=>{ const k=r.entidad||'—'; if(!m[k]) m[k]={entidad:k, n:0, total:0}; m[k].n++; m[k].total+=Number(r.total||0); });
+  return Object.values(m).map(x=>({ entidad:x.entidad, n:x.n, total:R2(x.total) })).sort((a,b)=>b.total-a.total);
+}
 
 const CCFG = {
   cobrar: { tipo:'COBRANZA', serie:'COBRANZA', arr:()=>DB.cobranzas, docs:()=>DB.ventas, ents:()=>DB.clientes,
@@ -3587,6 +3607,72 @@ VIEWS.repvendedor=(el)=>{
     ${list.map(v=>`<tr><td class="cell-strong">${nombre(v.usuario)}</td><td class="cell-mono">${v.usuario}</td><td style="text-align:center">${v.n}</td><td style="text-align:right" class="cell-strong">${money(v.total)}</td><td style="text-align:right" class="cell-mono">${money(v.n?v.total/v.n:0)}</td></tr>`).join('')}
     </tbody></table></div></div>`:emptyState('Sin ventas aún','Registra ventas para ver el rendimiento por vendedor.')}`;
 };
+/* ---------- REPORTE DE COBRANZAS / PAGOS (usa el motor puro filtrarRecibos) ---------- */
+const RREP = {
+  repcobranzas: { arr:()=>DB.cobranzas, title:'Reporte de Cobranzas', sub:'Cobros recibidos de clientes', entLabel:'Cliente', ents:()=>DB.clientes, accion:'Cobrado', color:'var(--green)', soft:'var(--green-soft)', conVendedor:true },
+  reppagos:     { arr:()=>DB.pagosprov, title:'Reporte de Pagos', sub:'Pagos realizados a proveedores', entLabel:'Proveedor', ents:()=>DB.proveedores, accion:'Pagado', color:'var(--red)', soft:'var(--red-soft)', conVendedor:false },
+};
+const RREPST = { repcobranzas:{ent:'',medio:'',hasta:'',vendedor:'',sumar:false}, reppagos:{ent:'',medio:'',hasta:'',vendedor:'',sumar:false} };
+function renderReporteRecibos(el, view){
+  const cfg=RREP[view], st=RREPST[view];
+  const medios=[...new Set(cfg.arr().map(r=>r.medio).filter(Boolean))];
+  const vendedorDe=ent=>(DB.clientes.find(c=>c.nombre===ent)||{}).vendedor||'';
+  const vendedores=cfg.conVendedor?[...new Set(DB.clientes.map(c=>c.vendedor).filter(Boolean))]:[];
+  let {list}=filtrarRecibos(cfg.arr(), {entidad:st.ent, medio:st.medio, hasta:st.hasta});
+  if(cfg.conVendedor && st.vendedor) list=list.filter(r=>vendedorDe(r.entidad)===st.vendedor);
+  const total=R2(list.reduce((s,r)=>s+Number(r.total||0),0));
+  const resumen=sumarizarRecibos(list);
+  el.innerHTML=`<div class="page-head"><div><h1>${cfg.title}</h1><p>${cfg.sub}</p></div>
+    <div style="display:flex;gap:10px"><button class="btn btn-ghost" id="rrExp">${ICN.download} Excel</button><button class="btn btn-primary" id="rrPrint">${ICN.print} Reporte</button></div></div>
+    <div class="card" style="margin-bottom:18px"><div style="padding:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:220px"><label>${cfg.entLabel}</label><select id="rr_ent"><option value="">— Todos —</option>${cfg.ents().map(e=>`<option ${st.ent===e.nombre?'selected':''}>${e.nombre}</option>`).join('')}</select></div>
+      ${cfg.conVendedor?`<div class="field" style="margin:0;min-width:160px"><label>Vendedor</label><select id="rr_vend"><option value="">— Todos —</option>${vendedores.map(v=>`<option ${st.vendedor===v?'selected':''}>${v}</option>`).join('')}</select></div>`:''}
+      <div class="field" style="margin:0;min-width:150px"><label>Medio de pago</label><select id="rr_medio"><option value="">— Todos —</option>${medios.map(m=>`<option ${st.medio===m?'selected':''}>${m}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0"><label>${cfg.accion} hasta</label><input type="date" id="rr_hasta" value="${st.hasta}"></div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding-bottom:10px"><input type="checkbox" id="rr_sumar" ${st.sumar?'checked':''}> Sumarizado por ${cfg.entLabel.toLowerCase()}</label>
+      ${(st.ent||st.medio||st.hasta||st.vendedor)?`<button class="btn btn-ghost btn-sm" id="rr_clear">Limpiar</button>`:''}
+    </div></div>
+    <div class="kpi-grid" style="margin-bottom:18px">
+      ${kpiCard('cobrar',cfg.color,cfg.soft,'Total '+cfg.accion.toLowerCase(),money(total),list.length+' recibos',null)}
+      ${kpiCard('clientes','var(--brand)','var(--brand-soft)',cfg.entLabel+'s',resumen.length,'con movimientos',null)}
+    </div>
+    <div class="card"><div class="table-wrap">${st.sumar?
+      `<table><thead><tr><th>${cfg.entLabel}</th><th style="text-align:center">Nº recibos</th><th style="text-align:right">Total</th></tr></thead><tbody>
+        ${resumen.map(r=>`<tr><td class="cell-strong">${r.entidad}</td><td style="text-align:center">${r.n}</td><td style="text-align:right" class="cell-strong">${money(r.total)}</td></tr>`).join('')||emptyRow(3)}
+       </tbody><tfoot><tr><td class="cell-strong">TOTAL</td><td></td><td style="text-align:right" class="cell-strong">${money(total)}</td></tr></tfoot></table>`
+      :
+      `<table><thead><tr><th>Fecha</th><th>Recibo</th><th>${cfg.entLabel}</th><th>Medio</th><th>${cfg.conVendedor?'Cobrador':'Referencia'}</th><th style="text-align:right">Total</th></tr></thead><tbody>
+        ${list.map(r=>`<tr><td>${fmtDate(r.fecha)}</td><td class="cell-mono cell-strong">${r.num}</td><td class="cell-strong">${r.entidad||'—'}</td><td>${r.medio||'—'}</td><td>${r.persona||r.usuario||'—'}</td><td style="text-align:right" class="cell-strong">${money2(r.total,r.moneda)}</td></tr>`).join('')||emptyRow(6)}
+       </tbody><tfoot><tr><td colspan="5" class="cell-strong">TOTAL</td><td style="text-align:right" class="cell-strong">${money(total)}</td></tr></tfoot></table>`
+    }</div></div>`;
+  const set=(id,ev,fn)=>{const e=document.getElementById(id);if(e)e[ev]=fn;};
+  set('rr_ent','onchange',e=>{st.ent=e.target.value;renderReporteRecibos(el,view);});
+  set('rr_vend','onchange',e=>{st.vendedor=e.target.value;renderReporteRecibos(el,view);});
+  set('rr_medio','onchange',e=>{st.medio=e.target.value;renderReporteRecibos(el,view);});
+  set('rr_hasta','onchange',e=>{st.hasta=e.target.value;renderReporteRecibos(el,view);});
+  set('rr_sumar','onchange',e=>{st.sumar=e.target.checked;renderReporteRecibos(el,view);});
+  set('rr_clear','onclick',()=>{st.ent='';st.medio='';st.hasta='';st.vendedor='';renderReporteRecibos(el,view);});
+  set('rrExp','onclick',()=>{ let rows;
+    if(st.sumar){ rows=[[cfg.entLabel,'n_recibos','total'].join(',')].concat(resumen.map(r=>[csvCell(r.entidad),r.n,r.total].join(','))); }
+    else { rows=[['fecha','recibo',cfg.entLabel.toLowerCase(),'medio','referencia','total'].join(',')].concat(list.map(r=>[r.fecha,csvCell(r.num),csvCell(r.entidad),csvCell(r.medio),csvCell(r.persona||r.usuario),Number(r.total||0)].join(','))); }
+    downloadCSV(view+'.csv', rows.join('\n')); toast('Reporte exportado','success'); });
+  set('rrPrint','onclick',()=>printReporteRecibos(cfg, st.sumar?resumen:list, total, st.sumar));
+}
+function printReporteRecibos(cfg, data, total, sumar){
+  const w=window.open('','_blank','width=900,height=1000'); if(!w){toast('Permite las ventanas emergentes','error');return;}
+  const body=sumar
+    ? data.map(r=>`<tr><td>${r.entidad}</td><td class="c">${r.n}</td><td class="r">${money(r.total)}</td></tr>`).join('')
+    : data.map(r=>`<tr><td>${fmtDate(r.fecha)}</td><td>${r.num}</td><td>${r.entidad||''}</td><td>${r.medio||''}</td><td class="r">${money2(r.total,r.moneda)}</td></tr>`).join('');
+  const head=sumar?'<th>'+cfg.entLabel+'</th><th class="c">Nº</th><th class="r">Total</th>':'<th>Fecha</th><th>Recibo</th><th>'+cfg.entLabel+'</th><th>Medio</th><th class="r">Total</th>';
+  w.document.write(`<html><head><title>${cfg.title}</title><meta charset="utf-8"><style>body{font-family:Arial;font-size:11px;padding:24px;color:#111}h1{color:#e01f26;font-size:16px;margin:0}table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#111;color:#fff;padding:6px;text-align:left;font-size:10px}td{padding:5px 6px;border-bottom:1px solid #eee}td.r,th.r{text-align:right}td.c,th.c{text-align:center}.tot{font-size:16px;font-weight:800;text-align:right;margin-top:10px}@media print{body{padding:0}}</style></head><body>
+    <h1>${COMPANY.nombre}</h1><div>${cfg.title}${cfg.__filtro||''} · ${fmtDate(new Date().toISOString().slice(0,10))}</div>
+    <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+    <div class="tot">TOTAL: ${money(total)}</div>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
+VIEWS.repcobranzas=(el)=>renderReporteRecibos(el,'repcobranzas');
+VIEWS.reppagos=(el)=>renderReporteRecibos(el,'reppagos');
 VIEWS.repstockmuerto=(el)=>{
   const vendidos=new Set(); DB.ventas.filter(v=>v.estado!=='Anulada').forEach(v=>(v.lineas||[]).forEach(l=>{ if(l.prodId) vendidos.add(l.prodId); }));
   const muertos=DB.productos.filter(p=>Number(p.stock)>0 && !vendidos.has(p.id));

@@ -17,6 +17,7 @@ const src=[
   (HTML.match(/const R2 = [^\n]+/)||[''])[0],
   extractFn('docSaldo'), extractFn('estadoPorSaldo'),
   extractFn('aplicarAbonos'), extractFn('revertirAbonos'),
+  extractFn('filtrarRecibos'), extractFn('sumarizarRecibos'),
 ].join('\n');
 eval(src);
 
@@ -58,6 +59,25 @@ const near=(a,b)=>Math.abs(a-b)<0.005;
   ok(docSaldo({estado:'Pendiente', total:500})===500, 'sin campo saldo y Pendiente → usa el total (500)');
   ok(docSaldo({estado:'Pagada', total:500})===0, 'sin campo saldo y Pagada → 0');
   ok(docSaldo({estado:'Anulada', total:500, saldo:500})===0, 'Anulada → 0 (no cuenta como deuda)');
+
+  console.log('\n[7] Reporte de cobranzas (filtros + sumarizado)');
+  const recibos=[
+    {num:'RC01-1', entidad:'Cliente A', medio:'Efectivo',       fecha:'2026-08-01', total:100, estado:'Registrado'},
+    {num:'RC01-2', entidad:'Cliente A', medio:'Transferencia',  fecha:'2026-08-05', total:250, estado:'Registrado'},
+    {num:'RC01-3', entidad:'Cliente B', medio:'Efectivo',       fecha:'2026-08-10', total:400, estado:'Registrado'},
+    {num:'RC01-4', entidad:'Cliente B', medio:'Efectivo',       fecha:'2026-08-20', total:999, estado:'Anulado'},
+  ];
+  let fr=filtrarRecibos(recibos, {});
+  ok(fr.list.length===3 && near(fr.total,750), 'excluye anulados: 3 recibos, total 100+250+400 = 750');
+  fr=filtrarRecibos(recibos, {entidad:'Cliente A'});
+  ok(fr.list.length===2 && near(fr.total,350), 'filtra por cliente: A = 2 recibos, 350');
+  fr=filtrarRecibos(recibos, {medio:'Efectivo'});
+  ok(fr.list.length===2 && near(fr.total,500), 'filtra por medio: Efectivo (no anulado) = 100+400 = 500');
+  fr=filtrarRecibos(recibos, {hasta:'2026-08-05'});
+  ok(fr.list.length===2 && near(fr.total,350), 'cobrado hasta 05/08: 2 recibos, 350');
+  const res=sumarizarRecibos(filtrarRecibos(recibos, {}).list);
+  ok(res.length===2 && res[0].entidad==='Cliente B' && near(res[0].total,400), 'sumarizado por cliente ordena por total (B=400 primero)');
+  ok(res.find(x=>x.entidad==='Cliente A').n===2, 'sumarizado cuenta 2 recibos de Cliente A');
 
   console.log('\n================  RESULTADO COBRANZAS/PAGOS  ================');
   console.log(`  PASARON: ${pass}   FALLARON: ${fail}`);

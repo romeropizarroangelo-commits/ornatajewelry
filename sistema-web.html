@@ -713,6 +713,8 @@ const MENU = [
     { id:'repventasnetas', label:'Ventas Netas' },
     { id:'repranking', label:'Ranking de Ventas' },
     { id:'repvendedor', label:'Ventas por Vendedor' },
+    { id:'repcobranzas', label:'Reporte de Cobranzas' },
+    { id:'reppagos', label:'Reporte de Pagos', adminOnly:true },
     { id:'repinvvalorizado', label:'Inventario Valorizado' },
     { id:'repstockmuerto', label:'Stock Muerto' },
     { id:'repmovimientos', label:'Movimientos de Productos' },
@@ -756,7 +758,7 @@ function renderNav(){
   nav.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k=b.dataset.toggle; navExpanded[k]=!(navExpanded[k]||MENU.find(m=>m.key===k).children.some(c=>c.id===currentView)); renderNav(); });
 }
 
-const ADMIN_VIEWS = new Set(['configuracion','perfiles','repmargen','cierremensual','unioncodigo','empresas']);
+const ADMIN_VIEWS = new Set(['configuracion','perfiles','repmargen','cierremensual','unioncodigo','empresas','reppagos']);
 function go(view){
   if(ADMIN_VIEWS.has(view) && !esAdmin()){ toast('Solo el administrador puede acceder','error'); view='dashboard'; }
   currentView = view;
@@ -1530,6 +1532,24 @@ function revertirAbonos(docs, aplicaciones){
 }
 function totalPorCobrar(){ return R2(DB.ventas.reduce((s,v)=>s+docSaldo(v),0)); }
 function totalPorPagar(){ return R2(DB.compras.reduce((s,c)=>s+docSaldo(c),0)); }
+
+/* Reporte de cobranzas/pagos (PURO/testeable). Filtra recibos (excluye anulados) por
+   entidad, medio, y rango de fechas; devuelve la lista y el total. */
+function filtrarRecibos(recibos, f){
+  f=f||{};
+  let list=(recibos||[]).filter(r=>r.estado!=='Anulado');
+  if(f.entidad) list=list.filter(r=>r.entidad===f.entidad);
+  if(f.medio) list=list.filter(r=>r.medio===f.medio);
+  if(f.desde) list=list.filter(r=>String(r.fecha||'')>=f.desde);
+  if(f.hasta) list=list.filter(r=>String(r.fecha||'')<=f.hasta);
+  list=list.slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+  return { list, total:R2(list.reduce((s,r)=>s+Number(r.total||0),0)) };
+}
+function sumarizarRecibos(list){
+  const m={};
+  (list||[]).forEach(r=>{ const k=r.entidad||'—'; if(!m[k]) m[k]={entidad:k, n:0, total:0}; m[k].n++; m[k].total+=Number(r.total||0); });
+  return Object.values(m).map(x=>({ entidad:x.entidad, n:x.n, total:R2(x.total) })).sort((a,b)=>b.total-a.total);
+}
 
 const CCFG = {
   cobrar: { tipo:'COBRANZA', serie:'COBRANZA', arr:()=>DB.cobranzas, docs:()=>DB.ventas, ents:()=>DB.clientes,

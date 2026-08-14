@@ -452,6 +452,19 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## REPORTE DE COBRANZAS / PAGOS (2026-08-12)
+
+> Réplica del "Reporte de Cobranzas" del SGAE (filtros tipo doc/vendedor/cliente/cobrado hasta/sumarizado + Excel).
+
+- ✅ **Motor puro** (`filtrarRecibos`, `sumarizarRecibos`, testeados): filtra recibos (excluye anulados) por entidad/medio/rango de fechas → lista + total; sumariza por entidad ordenado por monto.
+- ✅ **Vistas** `repcobranzas` (clientes) y **`reppagos`** (proveedores, admin) desde un factory compartido `renderReporteRecibos`: filtros Cliente/Proveedor, **Vendedor** (solo cobranzas, resuelto del cliente), Medio de pago, **Cobrado/Pagado hasta**, y **Sumarizado por entidad**; KPIs total + nº entidades; tabla detalle o resumen con TOTAL; **Excel (CSV)** e **Imprimir** con membrete. En el menú Reportes.
+
+**Verificación:** `tests/cobranzas.test.js` +6 (excluye anulados; filtra por cliente/medio/fecha; sumarizado ordena por total). **Suite total: 172/172.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.
