@@ -2525,7 +2525,7 @@ VIEWS.tipocambio=(el)=>{
   const list=[...DB.tipocambio].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   el.innerHTML=`
     <div class="page-head"><div><h1>Tipo de Cambio</h1><p>Registro diario del dólar (US$ → S/). El sistema usa el más reciente.</p></div>
-      <button class="btn btn-primary" id="addTC">${ICN.plus} Registrar TC</button></div>
+      ${pgate('tipocambio','registrar',`<button class="btn btn-primary" id="addTC">${ICN.plus} Registrar TC</button>`)}</div>
     <div class="kpi-grid">
       ${kpiCard('money','var(--green)','var(--green-soft)','TC de venta vigente','S/ '+tcActual().toFixed(3), list[0]?('al '+fmtDate(list[0].fecha)):'sin registros',null)}
     </div>
@@ -2534,7 +2534,7 @@ VIEWS.tipocambio=(el)=>{
       ${list.map(t=>`<tr><td>${fmtDate(t.fecha)}</td><td style="text-align:right" class="cell-mono">${Number(t.compra||0).toFixed(3)}</td><td style="text-align:right" class="cell-strong">${Number(t.venta||0).toFixed(3)}</td>
         <td><div class="row-actions"><button class="icon-btn" data-edit="${t.id}">${ICN.edit}</button><button class="icon-btn del" data-del="${t.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(4)}
       </tbody></table></div></div>`;
-  document.getElementById('addTC').onclick=()=>tcModal();
+  { const b=document.getElementById('addTC'); if(b) b.onclick=()=>tcModal(); }
   el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>tcModal(b.dataset.edit));
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDialog('¿Eliminar registro?','',()=>{DB.tipocambio=DB.tipocambio.filter(x=>x.id!==b.dataset.del);save();go('tipocambio');toast('Eliminado','success');}));
 };
@@ -2777,7 +2777,7 @@ function renderAjuste(){
 let nc=null;
 VIEWS.notacredito=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Nota de Crédito</h1><p>Anula o devuelve una venta y repone el stock</p></div>
-    <div class="segmented" id="segNC"><button data-t="lista" class="active">Emitidas</button><button data-t="nueva">Nueva N. Crédito</button></div></div>
+    <div class="segmented" id="segNC"><button data-t="lista" class="active">Emitidas</button>${pgate('notacredito','registrar',`<button data-t="nueva">Nueva N. Crédito</button>`)}</div></div>
     <div id="ncBody"></div>`;
   el.querySelectorAll('#segNC button').forEach(btn=>btn.onclick=()=>{el.querySelectorAll('#segNC button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');btn.dataset.t==='nueva'?renderNCNueva():renderNCLista();});
   renderNCLista();
@@ -2851,7 +2851,7 @@ function printNC(n){ const cli=DB.clientes.find(c=>c.id===n.clienteId)||{nombre:
 let nd=null;
 VIEWS.notadebito=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Nota de Débito</h1><p>Cargo adicional al cliente (intereses, penalidades, ajustes)</p></div>
-    <div class="segmented" id="segND"><button data-t="lista" class="active">Emitidas</button><button data-t="nueva">Nueva N. Débito</button></div></div>
+    <div class="segmented" id="segND"><button data-t="lista" class="active">Emitidas</button>${pgate('notadebito','registrar',`<button data-t="nueva">Nueva N. Débito</button>`)}</div></div>
     <div id="ndBody"></div>`;
   el.querySelectorAll('#segND button').forEach(btn=>btn.onclick=()=>{el.querySelectorAll('#segND button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');btn.dataset.t==='nueva'?renderNDNueva():renderNDLista();});
   renderNDLista();
@@ -2919,7 +2919,7 @@ function printND(n){ const cli=DB.clientes.find(c=>c.id===n.clienteId)||{nombre:
 let guia=null;
 VIEWS.guiaremision=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Guía de Remisión</h1><p>Documento de traslado de mercadería (transporte)</p></div>
-    <div class="segmented" id="segGR"><button data-t="lista" class="active">Emitidas</button><button data-t="nueva">Nueva guía</button></div></div>
+    <div class="segmented" id="segGR"><button data-t="lista" class="active">Emitidas</button>${pgate('guiaremision','registrar',`<button data-t="nueva">Nueva guía</button>`)}</div></div>
     <div id="grBody"></div>`;
   el.querySelectorAll('#segGR button').forEach(btn=>btn.onclick=()=>{el.querySelectorAll('#segGR button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');btn.dataset.t==='nueva'?renderNuevaGR():renderGRLista();});
   renderGRLista();
@@ -3064,7 +3064,7 @@ VIEWS.gastos=(el)=>{
   const mes=new Date().toISOString().slice(0,7);
   const totalMes=list.filter(g=>(g.fecha||'').slice(0,7)===mes).reduce((s,g)=>s+Number(g.monto||0),0);
   el.innerHTML=`<div class="page-head"><div><h1>Gastos</h1><p>Registro de gastos del negocio</p></div>
-    <button class="btn btn-primary" id="addGasto">${ICN.plus} Nuevo gasto</button></div>
+    ${pgate('gastos','registrar',`<button class="btn btn-primary" id="addGasto">${ICN.plus} Nuevo gasto</button>`)}</div>
     <div class="kpi-grid">
       ${kpiCard('cobrar','var(--red)','var(--red-soft)','Gastos del mes',money(totalMes),mes,null)}
       ${kpiCard('money','var(--purple)','var(--purple-soft)','Gastos totales',money(total),list.length+' registros',null)}
@@ -3074,7 +3074,7 @@ VIEWS.gastos=(el)=>{
     ${list.map(g=>`<tr><td>${fmtDate(g.fecha)}</td><td><span class="badge badge-gray">${g.categoria||'—'}</span></td><td class="cell-strong">${g.concepto||''}</td><td>${g.metodo||''}</td><td class="cell-mono">${g.usuario||''}</td><td style="text-align:right" class="cell-strong">${money(g.monto)}</td>
       <td><div class="row-actions"><button class="icon-btn del" data-del="${g.id}">${ICN.del}</button></div></td></tr>`).join('')||emptyRow(7)}
     </tbody></table></div></div>`;
-  document.getElementById('addGasto').onclick=()=>gastoModal();
+  { const b=document.getElementById('addGasto'); if(b) b.onclick=()=>gastoModal(); }
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDialog('¿Eliminar gasto?','',()=>{DB.gastos=DB.gastos.filter(x=>x.id!==b.dataset.del);save();go('gastos');toast('Gasto eliminado','success');}));
 };
 function gastoModal(){
@@ -3098,7 +3098,7 @@ function gastoModal(){
 let oc=null;
 VIEWS.ordencompra=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Orden de Compra</h1><p>Pedidos a proveedores — al recibirlos ingresan el stock</p></div>
-    <div class="segmented" id="segOC"><button data-t="lista" class="active">Historial</button><button data-t="nueva">Nueva orden</button></div></div>
+    <div class="segmented" id="segOC"><button data-t="lista" class="active">Historial</button>${pgate('ordencompra','registrar',`<button data-t="nueva">Nueva orden</button>`)}</div></div>
     <div id="ocBody"></div>`;
   el.querySelectorAll('#segOC button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#segOC button').forEach(x=>x.classList.remove('active'));b.classList.add('active');b.dataset.t==='nueva'?renderNuevaOC():renderOCLista();});
   renderOCLista();
@@ -3187,7 +3187,7 @@ function landedCost(lineas, costos){
 let imp=null;
 VIEWS.importacion=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Importación</h1><p>Costo aterrizado: reparte flete, seguro y aduana entre tus productos</p></div>
-    <div class="segmented" id="segImp"><button data-t="lista" class="active">Historial</button><button data-t="nueva">Nueva importación</button></div></div>
+    <div class="segmented" id="segImp"><button data-t="lista" class="active">Historial</button>${pgate('importacion','registrar',`<button data-t="nueva">Nueva importación</button>`)}</div></div>
     <div id="impBody"></div>`;
   el.querySelectorAll('#segImp button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#segImp button').forEach(x=>x.classList.remove('active'));b.classList.add('active');b.dataset.t==='nueva'?renderNuevaImp():renderImpLista();});
   renderImpLista();
@@ -3311,12 +3311,12 @@ function canjearDocs(docs, ids, n, venc0, meta){
 VIEWS.letras=(el)=>{
   el.innerHTML=`<div class="page-head"><div><h1>Letras</h1><p>Control de pagos a plazo (letras de cambio)</p></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><div class="segmented" id="segLT"><button data-t="cobrar" class="${letrasTipo==='cobrar'?'active':''}">Por Cobrar</button><button data-t="pagar" class="${letrasTipo==='pagar'?'active':''}">Por Pagar</button></div>
-    <button class="btn btn-ghost" id="canjeFact">${ICN.plus} Canje de facturas</button>
-    <button class="btn btn-primary" id="addLetra">${ICN.plus} Nueva letra</button></div></div>
+    ${pgate('letras','registrar',`<button class="btn btn-ghost" id="canjeFact">${ICN.plus} Canje de facturas</button>`)}
+    ${pgate('letras','registrar',`<button class="btn btn-primary" id="addLetra">${ICN.plus} Nueva letra</button>`)}</div></div>
     <div id="ltBody"></div>`;
   el.querySelectorAll('#segLT button').forEach(b=>b.onclick=()=>{letrasTipo=b.dataset.t;VIEWS.letras(el);});
-  document.getElementById('addLetra').onclick=()=>letraModal();
-  document.getElementById('canjeFact').onclick=()=>canjeDocModal();
+  { const b=document.getElementById('addLetra'); if(b) b.onclick=()=>letraModal(); }
+  { const b=document.getElementById('canjeFact'); if(b) b.onclick=()=>canjeDocModal(); }
   renderLetras();
 };
 function renderLetras(){
