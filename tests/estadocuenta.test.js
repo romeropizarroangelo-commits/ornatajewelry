@@ -13,7 +13,7 @@ function extractFn(name){
   return HTML.slice(i,j);
 }
 const R2=n=>Math.round((Number(n)||0)*100)/100;
-eval(extractFn('ecToDays')+'\n'+extractFn('diasVencido')+'\n'+extractFn('bucketAntiguedad')+'\n'+extractFn('resumenAntiguedad'));
+eval(extractFn('ecToDays')+'\n'+extractFn('diasVencido')+'\n'+extractFn('bucketAntiguedad')+'\n'+extractFn('resumenAntiguedad')+'\n'+extractFn('totalVencido'));
 let pass=0,fail=0;
 function ok(c,m){ if(c){pass++;console.log('  ✓ '+m);} else {fail++;console.log('  ✗ FALLA: '+m);} }
 const near=(a,b)=>Math.abs(a-b)<0.005;
@@ -48,6 +48,10 @@ const near=(a,b)=>Math.abs(a-b)<0.005;
   ok(near(r.d61_90,300), '61–90 = 300');
   ok(near(r.d90,400), '+90 = 400');
   ok(near(r.total,1075), 'TOTAL = 1075 (suma de todos los saldos)');
+
+  console.log('\n[4] Vencido (para el Ranking de Morosos) = todo menos "por vencer"');
+  ok(near(totalVencido(r), 975), 'vencido = 225+50+300+400 = 975 (excluye los 100 por vencer)');
+  ok(near(r.total - r.porVencer, totalVencido(r)), 'vencido = total − por vencer');
 
   console.log('\n================  RESULTADO ESTADO DE CUENTA  ================');
   console.log(`  PASARON: ${pass}   FALLARON: ${fail}`);

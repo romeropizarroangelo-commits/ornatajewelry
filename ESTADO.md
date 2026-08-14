@@ -507,9 +507,13 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 - ✅ **Motor de antigüedad** (puro/testeado): `diasVencido` (usa vcto, o la emisión si no hay), `bucketAntiguedad` (Por vencer / 1–30 / 31–60 / 61–90 / +90), `resumenAntiguedad` (suma cada saldo en su tramo). `estadoCuentaDocs(cliente,hoy)` junta **facturas pendientes + notas de débito + letras por cobrar** del cliente (match por id o por nombre, robusto ante `clienteId=null`) con su saldo y días vencidos.
 - ✅ **Vista** `VIEWS.estadocuenta` (Reportes → Estado de Cuenta): selector de cliente (prioriza los que tienen deuda), tarjetas de antigüedad (5 tramos + TOTAL), tabla de documentos con días vencidos coloreados, y **Imprimir estado** (PDF con membrete, datos del cliente, cuadro de antigüedad y detalle).
 
-**Verificación:** `tests/estadocuenta.test.js` — 15/15 (días con/sin vcto; buckets en los bordes 0/1/30/31/60/61/90/91; resumen suma por tramo, total 1075). **Suite total: 197/197.**
+**Verificación:** `tests/estadocuenta.test.js` — 17/17 (días con/sin vcto; buckets en los bordes 0/1/30/31/60/61/90/91; resumen suma por tramo, total 1075; totalVencido = total − por vencer). **Suite total: 199/199.**
 
 **Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+### Ranking de Morosos (2026-08-12)
+- ✅ `morososData(hoy)` (reusa `estadoCuentaDocs`/`resumenAntiguedad`) + `totalVencido(r)` (testeado): por cada cliente con deuda, arma total/tramos/días máx/vencido.
+- ✅ Vista `VIEWS.morosos` (Reportes → Ranking de Morosos): filtro por vendedor y "solo con deuda vencida", KPIs (deuda vencida + cartera total), tabla ordenada por vencido con tramos por cliente, ojo → abre su Estado de Cuenta, y **Excel + Imprimir**.
 
 ---
 

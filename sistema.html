@@ -722,6 +722,7 @@ const MENU = [
     { id:'repvendedor', label:'Ventas por Vendedor' },
     { id:'repcobranzas', label:'Reporte de Cobranzas' },
     { id:'estadocuenta', label:'Estado de Cuenta' },
+    { id:'morosos', label:'Ranking de Morosos' },
     { id:'reppagos', label:'Reporte de Pagos', adminOnly:true },
     { id:'repinvvalorizado', label:'Inventario Valorizado' },
     { id:'repstockmuerto', label:'Stock Muerto' },
@@ -3809,6 +3810,61 @@ VIEWS.estadocuenta=(el)=>{
   document.getElementById('ecCli').onchange=e=>{ ecClienteId=e.target.value; go('estadocuenta'); };
   const pb=document.getElementById('ecPrint'); if(pb) pb.onclick=()=>printEstadoCuenta(cli, docs, r, hoy);
 };
+/* ---------- RANKING DE MOROSOS (reusa el motor de antigüedad) ---------- */
+function totalVencido(r){ return R2((Number(r.d1_30)||0)+(Number(r.d31_60)||0)+(Number(r.d61_90)||0)+(Number(r.d90)||0)); }
+function morososData(hoy){
+  const out=[];
+  DB.clientes.forEach(c=>{
+    const docs=estadoCuentaDocs(c,hoy); if(!docs.length) return;
+    const r=resumenAntiguedad(docs);
+    const maxDias=docs.reduce((m,d)=>Math.max(m,Number(d.dias)||0),0);
+    out.push({ cliente:c.nombre, vendedor:c.vendedor||'—', total:r.total, porVencer:r.porVencer, d1_30:r.d1_30, d31_60:r.d31_60, d61_90:r.d61_90, d90:r.d90, vencido:totalVencido(r), maxDias, docs:docs.length, id:c.id });
+  });
+  return out;
+}
+let morososSoloVencido=true, morososVend='';
+VIEWS.morosos=(el)=>{
+  const hoy=new Date().toISOString().slice(0,10);
+  let data=morososData(hoy);
+  const vends=[...new Set(data.map(x=>x.vendedor).filter(v=>v&&v!=='—'))];
+  if(morososVend) data=data.filter(x=>x.vendedor===morososVend);
+  if(morososSoloVencido) data=data.filter(x=>x.vencido>0.005);
+  data.sort((a,b)=>b.vencido-a.vencido || b.total-a.total);
+  const cartera=R2(data.reduce((s,x)=>s+x.total,0)), vencidoTot=R2(data.reduce((s,x)=>s+x.vencido,0));
+  el.innerHTML=`<div class="page-head"><div><h1>Ranking de Morosos</h1><p>Clientes ordenados por deuda vencida</p></div>
+    <div style="display:flex;gap:10px">${data.length?`<button class="btn btn-ghost" id="moExp">${ICN.download} Excel</button><button class="btn btn-primary" id="moPrint">${ICN.print} Imprimir</button>`:''}</div></div>
+    <div class="card" style="margin-bottom:18px"><div style="padding:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;min-width:180px"><label>Vendedor</label><select id="moVend"><option value="">— Todos —</option>${vends.map(v=>`<option ${morososVend===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding-bottom:10px"><input type="checkbox" id="moSolo" ${morososSoloVencido?'checked':''}> Solo con deuda vencida</label>
+    </div></div>
+    <div class="kpi-grid" style="margin-bottom:18px">
+      ${kpiCard('cobrar','var(--red)','var(--red-soft)','Deuda vencida',money(vencidoTot),data.length+' clientes',null)}
+      ${kpiCard('clientes','var(--amber)','var(--amber-soft)','Cartera total',money(cartera),'por cobrar',null)}
+    </div>
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>#</th><th>Cliente</th><th>Vendedor</th><th style="text-align:center">Días máx</th><th style="text-align:right">Por vencer</th><th style="text-align:right">1–30</th><th style="text-align:right">31–60</th><th style="text-align:right">61–90</th><th style="text-align:right">+90</th><th style="text-align:right">Vencido</th><th style="text-align:right">Total</th><th></th></tr></thead><tbody>
+      ${data.map((x,i)=>`<tr><td class="cell-mono">${i+1}</td><td class="cell-strong">${x.cliente}</td><td>${x.vendedor}</td>
+        <td style="text-align:center"><span style="color:${x.maxDias>90?'var(--red)':x.maxDias>0?'var(--amber)':'var(--green)'};font-weight:700">${x.maxDias>0?x.maxDias:'al día'}</span></td>
+        <td style="text-align:right">${x.porVencer?money(x.porVencer):'—'}</td><td style="text-align:right">${x.d1_30?money(x.d1_30):'—'}</td><td style="text-align:right">${x.d31_60?money(x.d31_60):'—'}</td><td style="text-align:right">${x.d61_90?money(x.d61_90):'—'}</td>
+        <td style="text-align:right;color:${x.d90?'var(--red)':''}">${x.d90?money(x.d90):'—'}</td>
+        <td style="text-align:right;color:${x.vencido>0.005?'var(--red)':''}" class="cell-strong">${money(x.vencido)}</td><td style="text-align:right" class="cell-strong">${money(x.total)}</td>
+        <td><button class="icon-btn" title="Ver estado de cuenta" data-ec="${x.id}">${ICN.eye}</button></td></tr>`).join('')||emptyRow(12)}
+      </tbody><tfoot><tr><td colspan="9" class="cell-strong">TOTALES</td><td style="text-align:right" class="cell-strong">${money(vencidoTot)}</td><td style="text-align:right" class="cell-strong">${money(cartera)}</td><td></td></tr></tfoot></table></div></div>`;
+  document.getElementById('moVend').onchange=e=>{ morososVend=e.target.value; go('morosos'); };
+  document.getElementById('moSolo').onchange=e=>{ morososSoloVencido=e.target.checked; go('morosos'); };
+  el.querySelectorAll('[data-ec]').forEach(b=>b.onclick=()=>{ ecClienteId=b.dataset.ec; go('estadocuenta'); });
+  const ex=document.getElementById('moExp'); if(ex) ex.onclick=()=>{ const rows=[['#','cliente','vendedor','dias_max','por_vencer','1_30','31_60','61_90','mas_90','vencido','total'].join(',')].concat(data.map((x,i)=>[i+1,csvCell(x.cliente),csvCell(x.vendedor),x.maxDias,x.porVencer,x.d1_30,x.d31_60,x.d61_90,x.d90,x.vencido,x.total].join(','))); downloadCSV('morosos.csv',rows.join('\n')); toast('Ranking exportado','success'); };
+  const pb=document.getElementById('moPrint'); if(pb) pb.onclick=()=>printMorosos(data, cartera, vencidoTot, hoy);
+};
+function printMorosos(data, cartera, vencido, hoy){
+  const w=window.open('','_blank','width=980,height=1000'); if(!w){toast('Permite las ventanas emergentes','error');return;}
+  const rows=data.map((x,i)=>`<tr><td>${i+1}</td><td>${x.cliente}</td><td>${x.vendedor}</td><td class="c">${x.maxDias>0?x.maxDias:'al día'}</td><td class="r">${money(x.d1_30)}</td><td class="r">${money(x.d31_60)}</td><td class="r">${money(x.d61_90)}</td><td class="r">${money(x.d90)}</td><td class="r">${money(x.vencido)}</td><td class="r">${money(x.total)}</td></tr>`).join('');
+  w.document.write(`<html><head><title>Ranking de Morosos</title><meta charset="utf-8"><style>body{font-family:Arial;font-size:11px;padding:24px;color:#111}h1{color:#e01f26;font-size:16px;margin:0}table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#111;color:#fff;padding:5px;text-align:left;font-size:9px}td{padding:4px 5px;border-bottom:1px solid #eee}td.r,th.r{text-align:right}td.c,th.c{text-align:center}.tot{font-size:14px;font-weight:800;text-align:right;margin-top:10px}@media print{body{padding:0}}</style></head><body>
+    <h1>${COMPANY.nombre}</h1><div>Ranking de Morosos · ${fmtDate(hoy)}</div>
+    <table><thead><tr><th>#</th><th>Cliente</th><th>Vendedor</th><th class="c">Días</th><th class="r">1–30</th><th class="r">31–60</th><th class="r">61–90</th><th class="r">+90</th><th class="r">Vencido</th><th class="r">Total</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="tot">Vencido: ${money(vencido)} · Cartera: ${money(cartera)}</div>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
 function printEstadoCuenta(cli, docs, r, hoy){
   const w=window.open('','_blank','width=820,height=1000'); if(!w){toast('Permite las ventanas emergentes','error');return;}
   const rows=docs.map(d=>`<tr><td>${d.tipo}</td><td>${d.num}</td><td>${fmtDate(d.fecha)}</td><td>${fmtDate(d.vcto)}</td><td class="c">${d.dias>0?d.dias:'al día'}</td><td class="r">${money(d.total)}</td><td class="r">${money(d.saldo)}</td></tr>`).join('');
