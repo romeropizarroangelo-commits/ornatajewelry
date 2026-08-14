@@ -434,7 +434,21 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 4. **Nota de Crédito Consulta**: columnas SUNAT (EST. SUNAT, CORREO SUNAT, ANEXO) → parte de Fase 5.
 5. Letras de Compra / CxP / NC Registro: ya replicados (confirman lo hecho).
 
-**Orden sugerido (sin backend):** (a) enriquecer **Clientes** (línea de crédito+moneda, distrito, vendedor, categoría, retención, contactos múltiples, persona natural/jurídica); (b) **Reporte de Cobranzas**; (c) enriquecer **Ventas** con panel de línea de crédito + PLACA/vendedor/OC + atajos. Las columnas EST./CORREO SUNAT son Fase 5 (electrónica).
+**Orden sugerido (sin backend):** (a) enriquecer **Clientes** ✅ HECHO; (b) **Reporte de Cobranzas**; (c) enriquecer **Ventas** con panel de línea de crédito + PLACA/vendedor/OC + atajos; (d) **Perfiles** granular (permisos por usuario/página/acción). Las columnas EST./CORREO SUNAT son Fase 5 (electrónica).
+
+---
+
+## CLIENTES COMPLETO (2026-08-12)  [elegido por el usuario]
+
+> Réplica potenciada de la ficha de Clientes del SGAE (captura del usuario). Antes: form básico (tipo doc, doc, nombre, contacto, tel, email, crédito, nivel, dir).
+
+- ✅ **Ficha completa** (`clienteModal` por secciones): Tipo de cliente (Jurídica/Natural), tipo doc + Nº + **enlace Consultar SUNAT**, razón social, **nombre comercial**, dirección, **distrito, zona, vendedor** (de usuarios), **categoría**; crédito con **moneda (S/ / US$)**, **Dcto. general (DG) / máximo (DM)**, **bloquear crédito**, **sujeto a retención**; contacto + área + teléfono + **3 celulares + 3 correos**; estado Activo/Inactivo, mostrar en reportes, y **"también es proveedor"** (lo registra en Proveedores si no existe).
+- ✅ **Tabla enriquecida**: columnas Vendedor, Distrito, Crédito (con moneda + ⛔ si bloqueado), Estado; búsqueda amplía a nombre comercial/distrito/vendedor/correo; etiqueta "tmb. proveedor".
+- ✅ **Bloqueo de crédito conectado**: `chequeoCredito` ahora rechaza la venta a crédito si el cliente tiene el crédito bloqueado (además del exceso de línea y sin línea). Todo aditivo y compatible con clientes existentes.
+
+**Verificación:** `tests/fase3.test.js` +1 (bloqueo de crédito). **Suite total: 166/166.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
 
 ---
 

@@ -1125,39 +1125,85 @@ VIEWS.clientes = (el) => {
 };
 function renderCliTable(){
   const q=cliQ.toLowerCase().trim();
-  const list=DB.clientes.filter(c=>!q||[c.nombre,c.doc,c.contacto,c.email].some(v=>(v||'').toLowerCase().includes(q)));
+  const list=DB.clientes.filter(c=>!q||[c.nombre,c.nomComercial,c.doc,c.contacto,c.email,c.correo1,c.distrito,c.vendedor].some(v=>(v||'').toLowerCase().includes(q)));
   const wrap=document.getElementById('cliTable');
   if(!list.length){wrap.innerHTML=emptyState('Sin clientes','Agrega tu primer cliente.');return;}
-  wrap.innerHTML=`<table><thead><tr><th>Cliente</th><th>Documento</th><th>Contacto</th><th>Teléfono</th><th style="text-align:right">Crédito</th><th></th></tr></thead><tbody>
+  const credLabel=c=>{ if(!(Number(c.credito)>0)) return '<span style="color:var(--ink-3)">Contado</span>'; const m=(c.monedaCredito==='US$'?'US$ ':'S/ ')+ (Number(c.credito)||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}); return c.bloqueoCredito?`<span style="color:var(--red)" title="Crédito bloqueado">⛔ ${m}</span>`:`<span class="cell-strong">${m}</span>`; };
+  wrap.innerHTML=`<table><thead><tr><th>Cliente</th><th>Documento</th><th>Vendedor</th><th>Distrito</th><th style="text-align:right">Crédito</th><th style="text-align:center">Estado</th><th></th></tr></thead><tbody>
     ${list.map(c=>`<tr>
       <td><div class="prod-cell"><div class="thumb" style="background:var(--brand-soft);color:var(--brand)">${(c.nombre||'?').charAt(0)}</div>
-        <div><div class="cell-strong">${c.nombre}</div><div style="color:var(--ink-3);font-size:12px">${c.email||''}</div></div></div></td>
+        <div><div class="cell-strong">${c.nombre}${c.esProveedor?' <span class="badge badge-gray" style="font-size:9px">tmb. proveedor</span>':''}</div><div style="color:var(--ink-3);font-size:12px">${c.nomComercial||c.correo1||c.email||''}</div></div></div></td>
       <td><span class="badge badge-gray">${c.tipoDoc||'—'}</span> <span class="cell-mono">${c.doc||''}</span></td>
-      <td>${c.contacto||'—'}</td><td class="cell-mono">${c.tel||'—'}</td>
-      <td style="text-align:right" class="cell-strong">${c.credito?money(c.credito):'<span style="color:var(--ink-3)">Contado</span>'}</td>
+      <td>${c.vendedor||'—'}</td><td>${c.distrito||'—'}</td>
+      <td style="text-align:right">${credLabel(c)}</td>
+      <td style="text-align:center">${(c.estado==='Inactivo')?'<span class="badge badge-red">Inactivo</span>':'<span class="badge badge-green">Activo</span>'}</td>
       <td><div class="row-actions"><button class="icon-btn" data-edit="${c.id}">${ICN.edit}</button><button class="icon-btn del" data-del="${c.id}">${ICN.del}</button></div></td>
     </tr>`).join('')}</tbody></table>`;
   wrap.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>clienteModal(b.dataset.edit));
   wrap.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDialog('¿Eliminar cliente?','',()=>{DB.clientes=DB.clientes.filter(x=>x.id!==b.dataset.del);save();renderCliTable();renderNav();toast('Cliente eliminado','success');}));
 }
+const CLI_CATEGORIAS=['Sin categoría','Mayorista','Taller','Flota','Frecuente','Ocasional'];
 function clienteModal(id){
-  const c=id?DB.clientes.find(x=>x.id===id):{tipoDoc:'RUC',credito:0};
+  const c=id?DB.clientes.find(x=>x.id===id):{tipoDoc:'RUC',tipoCliente:'Jurídica',credito:0,monedaCredito:'S/',estado:'Activo'};
+  const sec=t=>`<div class="field full" style="margin-top:4px"><div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--line);padding-bottom:6px">${t}</div></div>`;
+  const vendedores=[...new Set([...(DB.usuarios||[]).map(u=>u.nombre), c.vendedor].filter(Boolean))];
   openModal(id?'Editar cliente':'Nuevo cliente',`
     <div class="form-grid">
+      ${sec('Datos del cliente')}
+      <div class="field"><label>Tipo de cliente</label><select id="c_tipoCli"><option ${c.tipoCliente==='Jurídica'?'selected':''}>Jurídica</option><option ${c.tipoCliente==='Natural'?'selected':''}>Natural</option></select></div>
       <div class="field"><label>Tipo doc.</label><select id="c_tipo"><option ${c.tipoDoc==='RUC'?'selected':''}>RUC</option><option ${c.tipoDoc==='DNI'?'selected':''}>DNI</option><option ${c.tipoDoc==='CE'?'selected':''}>CE</option></select></div>
-      <div class="field"><label>Nº documento</label><input id="c_doc" value="${c.doc||''}"/></div>
-      <div class="field full"><label>Nombre / Razón social <span class="req">*</span></label><input id="c_nombre" value="${c.nombre||''}"/></div>
-      <div class="field"><label>Persona de contacto</label><input id="c_contacto" value="${c.contacto||''}"/></div>
-      <div class="field"><label>Teléfono</label><input id="c_tel" value="${c.tel||''}"/></div>
-      <div class="field"><label>Email</label><input id="c_email" value="${c.email||''}"/></div>
-      <div class="field"><label>Línea de crédito (S/)</label><input id="c_credito" type="number" value="${c.credito||0}"/></div>
+      <div class="field"><label>Nº documento <a href="https://e-consultaruc.sunat.gob.pe/cl-ti-itmrconsruc/FrameCriterioBusquedaWeb.jsp" target="_blank" rel="noopener" style="font-size:11px;color:var(--brand);font-weight:600;margin-left:6px">Consultar SUNAT ↗</a></label><input id="c_doc" value="${c.doc||''}"/></div>
       <div class="field"><label>Nivel de precio</label><select id="c_nivel">${Object.keys(NIVELES).map(k=>`<option value="${k}" ${(c.nivelPrecio||'mostrador')===k?'selected':''}>${NIVELES[k]}</option>`).join('')}</select></div>
+      <div class="field full"><label>Razón social / Nombre <span class="req">*</span></label><input id="c_nombre" value="${c.nombre||''}"/></div>
+      <div class="field full"><label>Nombre comercial</label><input id="c_nomcom" value="${c.nomComercial||''}"/></div>
       <div class="field full"><label>Dirección</label><input id="c_dir" value="${c.dir||''}"/></div>
+      <div class="field"><label>Distrito</label><input id="c_distrito" value="${c.distrito||''}"/></div>
+      <div class="field"><label>Zona</label><input id="c_zona" value="${c.zona||''}"/></div>
+      <div class="field"><label>Vendedor</label><select id="c_vendedor"><option value="">— Sin asignar —</option>${vendedores.map(v=>`<option ${c.vendedor===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="field"><label>Categoría</label><select id="c_categoria">${CLI_CATEGORIAS.map(k=>`<option ${((c.categoria||'Sin categoría')===k)?'selected':''}>${k}</option>`).join('')}</select></div>
+
+      ${sec('Crédito')}
+      <div class="field"><label>Línea de crédito</label><input id="c_credito" type="number" step="0.01" value="${c.credito||0}"/></div>
+      <div class="field"><label>Moneda del crédito</label><select id="c_moncred"><option ${c.monedaCredito==='S/'?'selected':''}>S/</option><option ${c.monedaCredito==='US$'?'selected':''}>US$</option></select></div>
+      <div class="field"><label>Dcto. general % (DG)</label><input id="c_dg" type="number" step="0.01" value="${c.dg||0}"/></div>
+      <div class="field"><label>Dcto. máximo % (DM)</label><input id="c_dm" type="number" step="0.01" value="${c.dm||0}"/></div>
+      <div class="field"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer"><input type="checkbox" id="c_bloqueo" ${c.bloqueoCredito?'checked':''}> Bloquear crédito</label></div>
+      <div class="field"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer"><input type="checkbox" id="c_retencion" ${c.retencion?'checked':''}> Sujeto a retención</label></div>
+
+      ${sec('Datos de contacto')}
+      <div class="field"><label>Contacto</label><input id="c_contacto" value="${c.contacto||''}"/></div>
+      <div class="field"><label>Área</label><input id="c_area" value="${c.area||''}"/></div>
+      <div class="field"><label>Teléfono</label><input id="c_tel" value="${c.tel||''}"/></div>
+      <div class="field"><label>Celular 1</label><input id="c_cel1" value="${c.cel1||''}"/></div>
+      <div class="field"><label>Celular 2</label><input id="c_cel2" value="${c.cel2||''}"/></div>
+      <div class="field"><label>Celular 3</label><input id="c_cel3" value="${c.cel3||''}"/></div>
+      <div class="field"><label>Correo 1</label><input id="c_correo1" value="${c.correo1||c.email||''}"/></div>
+      <div class="field"><label>Correo 2</label><input id="c_correo2" value="${c.correo2||''}"/></div>
+      <div class="field"><label>Correo 3</label><input id="c_correo3" value="${c.correo3||''}"/></div>
+
+      ${sec('Estado')}
+      <div class="field"><label>Estado</label><select id="c_estado"><option ${c.estado!=='Inactivo'?'selected':''}>Activo</option><option ${c.estado==='Inactivo'?'selected':''}>Inactivo</option></select></div>
+      <div class="field"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer"><input type="checkbox" id="c_mostrar" ${c.mostrarReporte!==false?'checked':''}> Mostrar en reportes</label></div>
+      <div class="field"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer"><input type="checkbox" id="c_esprov" ${c.esProveedor?'checked':''}> También es proveedor</label></div>
     </div>`,()=>{
-    const nombre=val('c_nombre'); if(!nombre){toast('El nombre es obligatorio','error');return false;}
-    const data={tipoDoc:val('c_tipo'),doc:val('c_doc'),nombre,contacto:val('c_contacto'),tel:val('c_tel'),email:val('c_email'),credito:parseFloat(val('c_credito'))||0,nivelPrecio:val('c_nivel'),dir:val('c_dir')};
+    const nombre=val('c_nombre'); if(!nombre){toast('La razón social / nombre es obligatorio','error');return false;}
+    const chk=x=>{const e=document.getElementById(x);return !!(e&&e.checked);};
+    const data={
+      tipoCliente:val('c_tipoCli'), tipoDoc:val('c_tipo'), doc:val('c_doc'), nombre, nomComercial:val('c_nomcom'),
+      dir:val('c_dir'), distrito:val('c_distrito'), zona:val('c_zona'), vendedor:val('c_vendedor'), categoria:val('c_categoria'), nivelPrecio:val('c_nivel'),
+      credito:parseFloat(val('c_credito'))||0, monedaCredito:val('c_moncred'), dg:parseFloat(val('c_dg'))||0, dm:parseFloat(val('c_dm'))||0,
+      bloqueoCredito:chk('c_bloqueo'), retencion:chk('c_retencion'),
+      contacto:val('c_contacto'), area:val('c_area'), tel:val('c_tel'), cel1:val('c_cel1'), cel2:val('c_cel2'), cel3:val('c_cel3'),
+      correo1:val('c_correo1'), correo2:val('c_correo2'), correo3:val('c_correo3'), email:val('c_correo1'),
+      estado:val('c_estado'), mostrarReporte:chk('c_mostrar'), esProveedor:chk('c_esprov'),
+    };
     if(id){Object.assign(DB.clientes.find(x=>x.id===id),data);toast('Cliente actualizado','success');}
     else{DB.clientes.unshift({id:uid(),...data});toast('Cliente agregado','success');}
+    // "También es proveedor": lo registra en Proveedores si no existe (por documento o nombre).
+    if(data.esProveedor && !DB.proveedores.some(p=>(data.doc&&p.doc===data.doc)||p.nombre===data.nombre)){
+      DB.proveedores.unshift({id:uid(),doc:data.doc,nombre:data.nombre,contacto:data.contacto,tel:data.tel,email:data.correo1,dir:data.dir});
+      toast('También agregado como proveedor','success');
+    }
     save();renderCliTable();renderNav();return true;
   });
 }
@@ -1379,6 +1425,7 @@ function deudaCliente(clienteId){
 }
 function chequeoCredito(clienteId, total){
   const c=DB.clientes.find(x=>x.id===clienteId); if(!c) return {ok:true};
+  if(c.bloqueoCredito) return {ok:false, msg:`${c.nombre} tiene el crédito BLOQUEADO. La venta debe ser al contado.`};
   const linea=Number(c.credito)||0;
   if(linea<=0) return {ok:false, msg:`${c.nombre} no tiene línea de crédito. La venta debe ser al contado.`};
   const deuda=deudaCliente(clienteId);

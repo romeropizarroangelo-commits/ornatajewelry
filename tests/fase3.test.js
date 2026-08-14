@@ -30,7 +30,7 @@ function ok(c,m){ if(c){pass++;console.log('  ✓ '+m);} else {fail++;console.lo
   console.log('\n[2] Control de crédito');
   const money=n=>'S/ '+(Number(n)||0).toFixed(2);
   let DB={
-    clientes:[{id:'c1',nombre:'Transportes',credito:1000},{id:'c2',nombre:'Contado SA',credito:0}],
+    clientes:[{id:'c1',nombre:'Transportes',credito:1000},{id:'c2',nombre:'Contado SA',credito:0},{id:'c3',nombre:'Bloqueado SA',credito:5000,bloqueoCredito:true}],
     ventas:[{clienteId:'c1',estado:'Pendiente',total:300}],
   };
   eval(extractFn('docSaldo')+'\n'+extractFn('esPendienteDoc')+'\n'+extractFn('deudaCliente')+'\n'+extractFn('chequeoCredito'));
@@ -38,6 +38,7 @@ function ok(c,m){ if(c){pass++;console.log('  ✓ '+m);} else {fail++;console.lo
   ok(chequeoCredito('c1',500).ok===true, 'permite: 300 deuda + 500 = 800 ≤ línea 1000');
   ok(chequeoCredito('c1',800).ok===false, 'BLOQUEA: 300 + 800 = 1100 > línea 1000 (excede crédito)');
   ok(chequeoCredito('c2',100).ok===false, 'BLOQUEA venta a crédito a cliente sin línea (credito 0)');
+  ok(chequeoCredito('c3',100).ok===false, 'BLOQUEA a cliente con crédito BLOQUEADO aunque tenga línea (5000)');
 })();
 
 // ===== [3] Costo promedio ponderado (réplica exacta de emitirCompra) =====
