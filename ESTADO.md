@@ -502,6 +502,17 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## ESTADO DE CUENTA con antigüedad de deuda (2026-08-12)
+
+- ✅ **Motor de antigüedad** (puro/testeado): `diasVencido` (usa vcto, o la emisión si no hay), `bucketAntiguedad` (Por vencer / 1–30 / 31–60 / 61–90 / +90), `resumenAntiguedad` (suma cada saldo en su tramo). `estadoCuentaDocs(cliente,hoy)` junta **facturas pendientes + notas de débito + letras por cobrar** del cliente (match por id o por nombre, robusto ante `clienteId=null`) con su saldo y días vencidos.
+- ✅ **Vista** `VIEWS.estadocuenta` (Reportes → Estado de Cuenta): selector de cliente (prioriza los que tienen deuda), tarjetas de antigüedad (5 tramos + TOTAL), tabla de documentos con días vencidos coloreados, y **Imprimir estado** (PDF con membrete, datos del cliente, cuadro de antigüedad y detalle).
+
+**Verificación:** `tests/estadocuenta.test.js` — 15/15 (días con/sin vcto; buckets en los bordes 0/1/30/31/60/61/90/91; resumen suma por tramo, total 1075). **Suite total: 197/197.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.

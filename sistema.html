@@ -721,6 +721,7 @@ const MENU = [
     { id:'repranking', label:'Ranking de Ventas' },
     { id:'repvendedor', label:'Ventas por Vendedor' },
     { id:'repcobranzas', label:'Reporte de Cobranzas' },
+    { id:'estadocuenta', label:'Estado de Cuenta' },
     { id:'reppagos', label:'Reporte de Pagos', adminOnly:true },
     { id:'repinvvalorizado', label:'Inventario Valorizado' },
     { id:'repstockmuerto', label:'Stock Muerto' },
@@ -1597,6 +1598,26 @@ function sumarizarRecibos(list){
   const m={};
   (list||[]).forEach(r=>{ const k=r.entidad||'—'; if(!m[k]) m[k]={entidad:k, n:0, total:0}; m[k].n++; m[k].total+=Number(r.total||0); });
   return Object.values(m).map(x=>({ entidad:x.entidad, n:x.n, total:R2(x.total) })).sort((a,b)=>b.total-a.total);
+}
+
+/* Antigüedad de deuda (aging 30/60/90) — PURO/testeable. */
+function ecToDays(s){ const p=String(s||'').split('-').map(Number); if(p.length<3 || !p[0]) return null; return Date.UTC(p[0],p[1]-1,p[2])/86400000; }
+function diasVencido(doc, hoy){ const a=ecToDays(doc.vcto||doc.fecha), b=ecToDays(hoy); if(a==null||b==null) return 0; return Math.round(b-a); }
+function bucketAntiguedad(dias){ dias=Number(dias)||0; if(dias<=0) return 'porVencer'; if(dias<=30) return 'd1_30'; if(dias<=60) return 'd31_60'; if(dias<=90) return 'd61_90'; return 'd90'; }
+function resumenAntiguedad(docs){
+  const r={porVencer:0,d1_30:0,d31_60:0,d61_90:0,d90:0,total:0};
+  (docs||[]).forEach(d=>{ const s=Number(d.saldo)||0; r[bucketAntiguedad(d.dias)]+=s; r.total+=s; });
+  Object.keys(r).forEach(k=>r[k]=R2(r[k])); return r;
+}
+// Documentos pendientes de un cliente (facturas + notas de débito + letras por cobrar) con días vencidos.
+function estadoCuentaDocs(cliente, hoy){
+  if(!cliente) return [];
+  const match=(cid,cname)=>(cliente.id&&cid===cliente.id)||(cname&&cname===cliente.nombre);
+  const out=[];
+  DB.ventas.filter(v=>esPendienteDoc(v)&&match(v.clienteId,v.cliente)).forEach(v=>out.push({tipo:v.metodo==='Crédito'?'Factura (créd.)':'Factura', num:v.num, fecha:v.fecha, vcto:v.vcto||v.fecha, total:Number(v.total)||0, saldo:docSaldo(v), dias:diasVencido({vcto:v.vcto,fecha:v.fecha},hoy)}));
+  (DB.notasdebito||[]).filter(n=>n.estado==='Pendiente'&&match(n.clienteId,n.cliente)).forEach(n=>out.push({tipo:'N. Débito', num:n.num||'—', fecha:n.fecha, vcto:n.fecha, total:Number(n.total)||0, saldo:Number(n.total)||0, dias:diasVencido({fecha:n.fecha},hoy)}));
+  (DB.letras||[]).filter(l=>l.tipo==='cobrar'&&l.estado!=='Pagada'&&((cliente.id&&l.entidadId===cliente.id)||l.entidad===cliente.nombre)).forEach(l=>out.push({tipo:'Letra', num:l.num, fecha:l.fechaEmision, vcto:l.fechaVencimiento, total:Number(l.monto)||0, saldo:letraSaldo(l), dias:diasVencido({vcto:l.fechaVencimiento,fecha:l.fechaEmision},hoy)}));
+  return out.sort((a,b)=>(b.dias||0)-(a.dias||0));
 }
 
 const CCFG = {
@@ -3754,6 +3775,63 @@ function printReporteRecibos(cfg, data, total, sumar){
 }
 VIEWS.repcobranzas=(el)=>renderReporteRecibos(el,'repcobranzas');
 VIEWS.reppagos=(el)=>renderReporteRecibos(el,'reppagos');
+/* ---------- ESTADO DE CUENTA con antigüedad (30/60/90) ---------- */
+let ecClienteId=null;
+function ecStat(label,color,val){ return `<div style="flex:1;min-width:130px;border:1px solid var(--line);border-radius:12px;padding:12px 14px"><div style="font-size:10.5px;color:var(--ink-3);letter-spacing:.5px;text-transform:uppercase">${label}</div><div style="font-size:19px;font-weight:800;color:${color}">${money(val)}</div></div>`; }
+VIEWS.estadocuenta=(el)=>{
+  const hoy=new Date().toISOString().slice(0,10);
+  const conDeuda=DB.clientes.filter(c=>estadoCuentaDocs(c,hoy).length>0);
+  const lista=conDeuda.length?conDeuda:DB.clientes;
+  if(!ecClienteId || !DB.clientes.some(c=>c.id===ecClienteId)) ecClienteId=(lista[0]||{}).id||null;
+  const cli=DB.clientes.find(c=>c.id===ecClienteId);
+  const docs=cli?estadoCuentaDocs(cli,hoy):[];
+  const r=resumenAntiguedad(docs);
+  el.innerHTML=`<div class="page-head"><div><h1>Estado de Cuenta</h1><p>Deuda del cliente con antigüedad (30 / 60 / 90 días)</p></div>
+    ${cli&&docs.length?`<button class="btn btn-primary" id="ecPrint">${ICN.print} Imprimir estado</button>`:''}</div>
+    <div class="card" style="margin-bottom:18px"><div style="padding:16px"><div class="field" style="margin:0;max-width:440px"><label>Cliente</label>
+      <select id="ecCli">${lista.map(c=>`<option value="${c.id}" ${ecClienteId===c.id?'selected':''}>${c.nombre}</option>`).join('')||'<option>(sin clientes)</option>'}</select></div>
+      ${conDeuda.length?`<div style="color:var(--ink-3);font-size:12px;margin-top:8px">${conDeuda.length} cliente(s) con deuda pendiente</div>`:'<div style="color:var(--green);font-size:12px;margin-top:8px">Ningún cliente tiene deuda pendiente 🎉</div>'}</div></div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px">
+      ${ecStat('Por vencer','var(--green)',r.porVencer)}
+      ${ecStat('1–30 días','var(--amber)',r.d1_30)}
+      ${ecStat('31–60 días','var(--amber)',r.d31_60)}
+      ${ecStat('61–90 días','var(--red)',r.d61_90)}
+      ${ecStat('+90 días','var(--red)',r.d90)}
+      ${ecStat('TOTAL','var(--brand)',r.total)}
+    </div>
+    <div class="card"><div class="section-title">Documentos pendientes${cli?' · '+cli.nombre:''}</div><div class="table-wrap">
+      <table><thead><tr><th>Tipo</th><th>Documento</th><th>Emisión</th><th>Vcto</th><th style="text-align:center">Días vencido</th><th style="text-align:right">Total</th><th style="text-align:right">Saldo</th></tr></thead><tbody>
+      ${docs.map(d=>`<tr><td>${d.tipo}</td><td class="cell-mono cell-strong">${d.num}</td><td>${fmtDate(d.fecha)}</td><td>${fmtDate(d.vcto)}</td>
+        <td style="text-align:center"><span style="color:${d.dias>90?'var(--red)':d.dias>0?'var(--amber)':'var(--green)'};font-weight:700">${d.dias>0?d.dias:'al día'}</span></td>
+        <td style="text-align:right">${money(d.total)}</td><td style="text-align:right" class="cell-strong">${money(d.saldo)}</td></tr>`).join('')||emptyRow(7)}
+      </tbody><tfoot><tr><td colspan="6" class="cell-strong">TOTAL ADEUDADO</td><td style="text-align:right" class="cell-strong">${money(r.total)}</td></tr></tfoot></table>
+    </div></div>`;
+  document.getElementById('ecCli').onchange=e=>{ ecClienteId=e.target.value; go('estadocuenta'); };
+  const pb=document.getElementById('ecPrint'); if(pb) pb.onclick=()=>printEstadoCuenta(cli, docs, r, hoy);
+};
+function printEstadoCuenta(cli, docs, r, hoy){
+  const w=window.open('','_blank','width=820,height=1000'); if(!w){toast('Permite las ventanas emergentes','error');return;}
+  const rows=docs.map(d=>`<tr><td>${d.tipo}</td><td>${d.num}</td><td>${fmtDate(d.fecha)}</td><td>${fmtDate(d.vcto)}</td><td class="c">${d.dias>0?d.dias:'al día'}</td><td class="r">${money(d.total)}</td><td class="r">${money(d.saldo)}</td></tr>`).join('');
+  w.document.write(`<html><head><title>Estado de Cuenta ${cli?cli.nombre:''}</title><meta charset="utf-8"><style>
+    body{font-family:Arial;font-size:12px;padding:26px;color:#111}h1{color:#e01f26;font-size:16px;margin:0}
+    .box{border:1px solid #ccc;border-radius:8px;padding:12px;margin-top:12px}.row{display:flex;justify-content:space-between;margin:2px 0}.k{color:#666}
+    table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#111;color:#fff;padding:6px;text-align:left;font-size:10px}td{padding:5px 6px;border-bottom:1px solid #eee}td.r,th.r{text-align:right}td.c,th.c{text-align:center}
+    .aging{display:flex;gap:8px;margin-top:12px}.ag{flex:1;border:1px solid #ddd;border-radius:6px;padding:8px;text-align:center;font-size:10px}.ag b{display:block;font-size:13px;margin-top:3px}
+    .tot{font-size:18px;font-weight:800;text-align:right;margin-top:12px}@media print{body{padding:0}}</style></head><body>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h1>${COMPANY.nombre}</h1><div style="color:#666">RUC ${COMPANY.ruc}</div></div>
+      <div style="text-align:right"><div style="font-weight:800;font-size:14px">ESTADO DE CUENTA</div><div>${fmtDate(hoy)}</div></div></div>
+    <div class="box"><div class="row"><span class="k">Cliente:</span><b>${cli?cli.nombre:''}</b></div>
+      <div class="row"><span class="k">Documento:</span><span>${cli?((cli.tipoDoc||'')+' '+(cli.doc||'')):''}</span></div>
+      ${cli&&cli.vendedor?`<div class="row"><span class="k">Vendedor:</span><span>${cli.vendedor}</span></div>`:''}</div>
+    <div class="aging">
+      <div class="ag">Por vencer<b>${money(r.porVencer)}</b></div><div class="ag">1–30<b>${money(r.d1_30)}</b></div>
+      <div class="ag">31–60<b>${money(r.d31_60)}</b></div><div class="ag">61–90<b>${money(r.d61_90)}</b></div><div class="ag">+90<b>${money(r.d90)}</b></div>
+    </div>
+    <table><thead><tr><th>Tipo</th><th>Documento</th><th>Emisión</th><th>Vcto</th><th class="c">Días</th><th class="r">Total</th><th class="r">Saldo</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="tot">TOTAL ADEUDADO: ${money(r.total)}</div>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
 VIEWS.repstockmuerto=(el)=>{
   const vendidos=new Set(); DB.ventas.filter(v=>v.estado!=='Anulada').forEach(v=>(v.lineas||[]).forEach(l=>{ if(l.prodId) vendidos.add(l.prodId); }));
   const muertos=DB.productos.filter(p=>Number(p.stock)>0 && !vendidos.has(p.id));

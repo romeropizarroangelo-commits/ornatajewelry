@@ -714,6 +714,7 @@ const MENU = [
     { id:'repranking', label:'Ranking de Ventas' },
     { id:'repvendedor', label:'Ventas por Vendedor' },
     { id:'repcobranzas', label:'Reporte de Cobranzas' },
+    { id:'estadocuenta', label:'Estado de Cuenta' },
     { id:'reppagos', label:'Reporte de Pagos', adminOnly:true },
     { id:'repinvvalorizado', label:'Inventario Valorizado' },
     { id:'repstockmuerto', label:'Stock Muerto' },
@@ -1590,6 +1591,26 @@ function sumarizarRecibos(list){
   const m={};
   (list||[]).forEach(r=>{ const k=r.entidad||'—'; if(!m[k]) m[k]={entidad:k, n:0, total:0}; m[k].n++; m[k].total+=Number(r.total||0); });
   return Object.values(m).map(x=>({ entidad:x.entidad, n:x.n, total:R2(x.total) })).sort((a,b)=>b.total-a.total);
+}
+
+/* Antigüedad de deuda (aging 30/60/90) — PURO/testeable. */
+function ecToDays(s){ const p=String(s||'').split('-').map(Number); if(p.length<3 || !p[0]) return null; return Date.UTC(p[0],p[1]-1,p[2])/86400000; }
+function diasVencido(doc, hoy){ const a=ecToDays(doc.vcto||doc.fecha), b=ecToDays(hoy); if(a==null||b==null) return 0; return Math.round(b-a); }
+function bucketAntiguedad(dias){ dias=Number(dias)||0; if(dias<=0) return 'porVencer'; if(dias<=30) return 'd1_30'; if(dias<=60) return 'd31_60'; if(dias<=90) return 'd61_90'; return 'd90'; }
+function resumenAntiguedad(docs){
+  const r={porVencer:0,d1_30:0,d31_60:0,d61_90:0,d90:0,total:0};
+  (docs||[]).forEach(d=>{ const s=Number(d.saldo)||0; r[bucketAntiguedad(d.dias)]+=s; r.total+=s; });
+  Object.keys(r).forEach(k=>r[k]=R2(r[k])); return r;
+}
+// Documentos pendientes de un cliente (facturas + notas de débito + letras por cobrar) con días vencidos.
+function estadoCuentaDocs(cliente, hoy){
+  if(!cliente) return [];
+  const match=(cid,cname)=>(cliente.id&&cid===cliente.id)||(cname&&cname===cliente.nombre);
+  const out=[];
+  DB.ventas.filter(v=>esPendienteDoc(v)&&match(v.clienteId,v.cliente)).forEach(v=>out.push({tipo:v.metodo==='Crédito'?'Factura (créd.)':'Factura', num:v.num, fecha:v.fecha, vcto:v.vcto||v.fecha, total:Number(v.total)||0, saldo:docSaldo(v), dias:diasVencido({vcto:v.vcto,fecha:v.fecha},hoy)}));
+  (DB.notasdebito||[]).filter(n=>n.estado==='Pendiente'&&match(n.clienteId,n.cliente)).forEach(n=>out.push({tipo:'N. Débito', num:n.num||'—', fecha:n.fecha, vcto:n.fecha, total:Number(n.total)||0, saldo:Number(n.total)||0, dias:diasVencido({fecha:n.fecha},hoy)}));
+  (DB.letras||[]).filter(l=>l.tipo==='cobrar'&&l.estado!=='Pagada'&&((cliente.id&&l.entidadId===cliente.id)||l.entidad===cliente.nombre)).forEach(l=>out.push({tipo:'Letra', num:l.num, fecha:l.fechaEmision, vcto:l.fechaVencimiento, total:Number(l.monto)||0, saldo:letraSaldo(l), dias:diasVencido({vcto:l.fechaVencimiento,fecha:l.fechaEmision},hoy)}));
+  return out.sort((a,b)=>(b.dias||0)-(a.dias||0));
 }
 
 const CCFG = {
