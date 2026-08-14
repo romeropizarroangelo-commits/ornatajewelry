@@ -1852,12 +1852,12 @@ function catalogView(el,key){
   const m=CAT_META[key]; catQ='';
   el.innerHTML=`
     <div class="page-head"><div><h1>${m.plural}</h1><p>${DB.cat[key].length} ${m.plural.toLowerCase()} registrados</p></div>
-      <button class="btn btn-primary" id="catAdd">${ICN.plus} Nueva ${m.sing.toLowerCase()}</button></div>
+      ${pgate(key,'registrar',`<button class="btn btn-primary" id="catAdd">${ICN.plus} Nueva ${m.sing.toLowerCase()}</button>`)}</div>
     <div class="card"><div style="padding:16px;border-bottom:1px solid var(--line)">
       <div class="search" style="width:320px;max-width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input id="catq" placeholder="Buscar ${m.sing.toLowerCase()}..."/></div></div>
       <div class="table-wrap" id="catTable"></div></div>`;
-  document.getElementById('catAdd').onclick=()=>catModal(key);
+  { const b=document.getElementById('catAdd'); if(b) b.onclick=()=>catModal(key); }
   const q=document.getElementById('catq'); q.oninput=()=>{catQ=q.value;renderCatTable(key);};
   renderCatTable(key);
 }
@@ -1871,7 +1871,7 @@ function renderCatTable(key){
     return `<tr><td><div class="prod-cell"><div class="thumb" style="background:${m.soft};color:${m.color}">${(x.nombre||'?').charAt(0)}</div><div class="cell-strong">${x.nombre}</div></div></td>
       ${m.price?`<td style="text-align:right" class="cell-strong">${money(x.precio)}</td>`:''}
       <td style="text-align:center">${(key==='marcas'||key==='lineas')?`<span class="badge badge-gray">${uso}</span>`:'—'}</td>
-      <td><div class="row-actions"><button class="icon-btn" data-edit="${x.id}">${ICN.edit}</button><button class="icon-btn del" data-del="${x.id}">${ICN.del}</button></div></td></tr>`;}).join('')}
+      <td><div class="row-actions">${pgate(key,'editar',`<button class="icon-btn" data-edit="${x.id}">${ICN.edit}</button>`)}${pgate(key,'eliminar',`<button class="icon-btn del" data-del="${x.id}">${ICN.del}</button>`)}</div></td></tr>`;}).join('')}
     </tbody></table>`;
   wrap.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>catModal(key,b.dataset.edit));
   wrap.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDialog('¿Eliminar?','',()=>{DB.cat[key]=DB.cat[key].filter(x=>x.id!==b.dataset.del);save();renderCatTable(key);toast('Eliminado','success');}));
@@ -2589,7 +2589,9 @@ function cajaHistorial(){
 }
 function drawCaja(){
   const b=document.getElementById('cajaBody'); const c=cajaAbierta();
+  const puedeCaja=puede('caja','registrar');
   if(!c){
+    if(!puedeCaja){ b.innerHTML=`<div class="card" style="padding:28px;max-width:460px"><p style="color:var(--ink-2)">No hay una caja abierta y no tienes permiso para abrirla.</p></div>${cajaHistorial()}`; return; }
     b.innerHTML=`<div class="card" style="padding:28px;max-width:460px">
       <h2 style="font-size:18px;margin-bottom:6px">Abrir caja</h2>
       <p style="color:var(--ink-2);margin-bottom:16px">Ingresa el efectivo con el que inicias el día.</p>
@@ -2613,7 +2615,7 @@ function drawCaja(){
       ${kpiCard('cart','var(--brand)','var(--brand-soft)','Ventas contado (hoy)',money(ventasContado),'referencia',null)}
       ${kpiCard('cobrar','var(--amber)','var(--amber-soft)','Egresos',money(egresos),c.movimientos.filter(m=>m.tipo==='egreso').length+' salidas',null)}
     </div>
-    <div class="grid-2">
+    ${puedeCaja?`<div class="grid-2">
       <div class="card"><div class="section-title">Registrar movimiento</div><div style="padding:16px">
         <div class="form-grid">
           <div class="field"><label>Tipo</label><select id="movTipo"><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option></select></div>
@@ -2628,11 +2630,12 @@ function drawCaja(){
         <div id="difArea"></div>
         <button class="btn btn-danger" id="btnCerrar" style="margin-top:12px">Cerrar caja con arqueo</button>
       </div></div>
-    </div>
+    </div>`:''}
     <div class="card" style="margin-top:20px"><div class="section-title">Movimientos de la caja actual</div><div class="table-wrap">
       <table><thead><tr><th>Hora</th><th>Tipo</th><th>Concepto</th><th>Usuario</th><th style="text-align:right">Monto</th></tr></thead><tbody>
       ${c.movimientos.length?c.movimientos.slice().reverse().map(m=>`<tr><td class="cell-mono">${(m.ts||'').slice(11,16)}</td><td>${m.tipo==='ingreso'?'<span class="badge badge-green">Ingreso</span>':'<span class="badge badge-red">Egreso</span>'}</td><td>${m.concepto||''}</td><td class="cell-mono">${m.usuario||''}</td><td style="text-align:right" class="cell-strong">${money(m.monto)}</td></tr>`).join(''):emptyRow(5)}
       </tbody></table></div></div>${cajaHistorial()}`;
+  if(!puedeCaja) return;
   document.getElementById('btnMov').onclick=async ()=>{
     const tipo=document.getElementById('movTipo').value, monto=parseFloat(document.getElementById('movMonto').value)||0, concepto=document.getElementById('movConcepto').value.trim();
     if(monto<=0){toast('Ingresa un monto válido','error');return;}
