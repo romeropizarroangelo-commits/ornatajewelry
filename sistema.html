@@ -1778,46 +1778,120 @@ function renderCompraLista(){
     ${kpiCard('cobrar','var(--amber)','var(--amber-soft)','Por pagar',money(pend),DB.compras.filter(esPendienteDoc).length+' pendientes',null)}
     </div>
     <div class="card"><div class="section-title">Facturas de compra</div><div class="table-wrap">
-    <table><thead><tr><th>Factura</th><th>Proveedor</th><th>Fecha</th><th style="text-align:center">Ítems</th><th>Estado</th><th style="text-align:right">Total</th></tr></thead><tbody>
-    ${DB.compras.map(c=>`<tr><td class="cell-mono cell-strong">${c.num}</td><td class="cell-strong">${c.proveedor}</td><td>${fmtDate(c.fecha)}</td>
-      <td style="text-align:center">${c.items}</td><td>${estadoBadge(c.estado)}</td><td style="text-align:right" class="cell-strong">${money(c.total)}</td></tr>`).join('')||emptyRow(6)}
+    <table><thead><tr><th>Registro</th><th>Doc. proveedor</th><th>Proveedor</th><th>Emisión</th><th style="text-align:center">Período</th><th style="text-align:center">Ítems</th><th>Estado</th><th style="text-align:right">Total</th></tr></thead><tbody>
+    ${DB.compras.map(c=>`<tr><td class="cell-mono cell-strong">${c.num}</td><td class="cell-mono">${c.numProv||'—'}</td><td class="cell-strong">${c.proveedor}</td><td>${fmtDate(c.fecha)}</td>
+      <td style="text-align:center" class="cell-mono">${c.periodo||'—'}</td><td style="text-align:center">${c.items}</td><td>${estadoBadge(c.estado)}</td><td style="text-align:right" class="cell-strong">${money2(c.total,c.moneda)}</td></tr>`).join('')||emptyRow(8)}
     </tbody></table></div></div>`;
 }
-function renderNuevaCompra(){ compra={proveedor:DB.proveedores[0]?.nombre||'', lines:[], metodo:'Contado'}; drawCompra(); }
+// Totales de compra (PURO/testeable). El costo de línea es la base (sin IGV, porque el IGV de
+// compras es crédito fiscal recuperable → no entra al costo del inventario). Con IGV suma el 18%.
+function compraTotales(lines, igvRate, conIGV){
+  const R=n=>Math.round((Number(n)||0)*100)/100;
+  const subtotal=R((lines||[]).reduce((s,l)=>s+(Number(l.costo)||0)*(Number(l.cant)||0),0));
+  const igv = conIGV ? R(subtotal*(Number(igvRate)||0)) : 0;
+  return { subtotal, igv, total:R(subtotal+igv) };
+}
+function periodoActual(){ return new Date().toISOString().slice(0,7).replace('-',''); }
+function renderNuevaCompra(){
+  const hoy=new Date().toISOString().slice(0,10);
+  compra={ tipoDoc:'Factura', proveedor:DB.proveedores[0]?.nombre||'', serie:'', numero:'', moneda:'S/', tc:tcActual(),
+    igvRate:0.18, conIGV:true, guia:'', periodo:periodoActual(), emision:hoy, ingreso:hoy, vcto:hoy,
+    metodo:'Contado', caja:'CAJA 1', lines:[], search:'' };
+  drawCompra();
+}
 function drawCompra(){
   const b=document.getElementById('compraBody');
-  const total=compra.lines.reduce((s,l)=>s+l.costo*l.cant,0);
-  b.innerHTML=`<div class="venta-layout">
-    <div class="card"><div class="section-title">Detalle de la compra</div>
-      <div style="padding:16px"><div class="line-add"><select class="filter-select" id="selProdC" style="flex:1">
-        <option value="">+ Agregar producto...</option>
-        ${DB.productos.map(p=>`<option value="${p.id}">${p.codigo} · ${p.desc}</option>`).join('')}
-      </select></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">Costo unit.</th><th style="text-align:right">Importe</th><th></th></tr></thead><tbody>
-        ${compra.lines.length?compra.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId);return `<tr>
-          <td><div class="cell-strong">${p.desc}</div><div class="cell-mono">${p.codigo}</div></td>
+  const t=compraTotales(compra.lines, compra.igvRate, compra.conIGV);
+  const mon=compra.moneda;
+  b.innerHTML=`
+    <div class="card" style="margin-bottom:18px"><div class="section-title">Datos del comprobante</div>
+      <div class="form-grid" style="padding:16px">
+        <div class="field"><label>Tipo doc.</label><select id="cTipoDoc"><option ${compra.tipoDoc==='Factura'?'selected':''}>Factura</option><option ${compra.tipoDoc==='Boleta'?'selected':''}>Boleta</option><option ${compra.tipoDoc==='Recibo'?'selected':''}>Recibo</option></select></div>
+        <div class="field"><label>Proveedor</label><select id="compraProv">${DB.proveedores.map(p=>`<option ${compra.proveedor===p.nombre?'selected':''}>${p.nombre}</option>`).join('')||'<option value="">(sin proveedores)</option>'}</select></div>
+        <div class="field"><label>Serie</label><input id="cSerie" value="${compra.serie}" placeholder="F001"></div>
+        <div class="field"><label>Número</label><input id="cNumero" value="${compra.numero}" placeholder="0001234"></div>
+        <div class="field"><label>Moneda</label><select id="cMoneda"><option ${mon==='S/'?'selected':''}>S/</option><option ${mon==='US$'?'selected':''}>US$</option></select></div>
+        <div class="field"><label>Tipo de cambio</label><input type="number" step="0.001" id="cTC" value="${compra.tc}"></div>
+        <div class="field"><label>IGV %</label><select id="cIgvRate"><option value="0.18" ${Number(compra.igvRate)===0.18?'selected':''}>18%</option><option value="0.10" ${Number(compra.igvRate)===0.10?'selected':''}>10%</option><option value="0" ${Number(compra.igvRate)===0?'selected':''}>0%</option></select></div>
+        <div class="field"><label>IGV</label><select id="cConIGV"><option value="1" ${compra.conIGV?'selected':''}>Con IGV</option><option value="0" ${!compra.conIGV?'selected':''}>Sin IGV</option></select></div>
+        <div class="field"><label>Guía de remisión</label><input id="cGuia" value="${compra.guia}" placeholder="Opcional"></div>
+        <div class="field"><label>Período</label><input id="cPeriodo" value="${compra.periodo}" placeholder="202608"></div>
+        <div class="field"><label>Condición pago</label><select id="compraMet"><option ${compra.metodo==='Contado'?'selected':''}>Contado</option><option ${compra.metodo==='Crédito'?'selected':''}>Crédito</option></select></div>
+        <div class="field"><label>Caja</label><input id="cCaja" value="${compra.caja}"></div>
+        <div class="field"><label>Emisión</label><input type="date" id="cEmision" value="${compra.emision}"></div>
+        <div class="field"><label>Ingreso</label><input type="date" id="cIngreso" value="${compra.ingreso}"></div>
+        <div class="field"><label>Vencimiento</label><input type="date" id="cVcto" value="${compra.vcto}"></div>
+      </div></div>
+    <div class="venta-layout">
+    <div class="card"><div class="section-title">Detalle (productos)</div>
+      <div style="padding:16px;position:relative"><div class="search" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="cSearch" placeholder="Buscar producto por código o nombre… (F2)" autocomplete="off"></div>
+        <div id="cResults" class="global-results" style="left:16px;right:16px"></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th style="text-align:center">Cant.</th><th>UM</th><th style="text-align:right">Costo unit.</th><th style="text-align:right">Importe</th><th></th></tr></thead><tbody>
+        ${compra.lines.length?compra.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId)||{};return `<tr>
+          <td class="cell-mono cell-strong">${p.codigo||'—'}</td>
+          <td class="cell-strong">${p.desc||'—'}</td>
+          <td>${p.marca||'—'}</td>
           <td style="text-align:center"><input class="qty-input" type="number" min="1" value="${l.cant}" data-cqty="${i}"/></td>
-          <td style="text-align:right"><input class="qty-input" type="number" step="0.01" style="width:90px" value="${l.costo}" data-ccost="${i}"/></td>
-          <td style="text-align:right" class="cell-strong">${money(l.costo*l.cant)}</td>
-          <td><div class="row-actions"><button class="icon-btn del" data-crm="${i}">${ICN.del}</button></div></td></tr>`;}).join(''):`<tr><td colspan="5" class="empty" style="padding:40px">${ICN.compras}<h3>Sin productos</h3><p>Agrega productos a la compra.</p></td></tr>`}
+          <td>${p.um||'UND'}</td>
+          <td style="text-align:right"><input class="qty-input" type="number" step="0.01" style="width:96px" value="${l.costo}" data-ccost="${i}"/></td>
+          <td style="text-align:right" class="cell-strong">${money2(l.costo*l.cant,mon)}</td>
+          <td><div class="row-actions"><button class="icon-btn del" data-crm="${i}">${ICN.del}</button></div></td></tr>`;}).join(''):`<tr><td colspan="8" class="empty" style="padding:40px">${ICN.compras}<h3>Sin productos</h3><p>Busca y agrega productos, o trae los de una Orden de Compra (F4).</p></td></tr>`}
       </tbody></table></div></div>
     <div class="card cart-summary">
-      <div class="field" style="margin-bottom:16px"><label>Proveedor</label><select id="compraProv">${DB.proveedores.map(p=>`<option ${compra.proveedor===p.nombre?'selected':''}>${p.nombre}</option>`).join('')}</select></div>
-      <div class="field" style="margin-bottom:16px"><label>Forma de pago</label><select id="compraMet"><option ${compra.metodo==='Contado'?'selected':''}>Contado</option><option ${compra.metodo==='Crédito'?'selected':''}>Crédito</option></select></div>
-      <div class="summ-row total"><span>Total</span><span>${money(total)}</span></div>
-      <button class="btn btn-primary" id="emitCompra" style="width:100%;justify-content:center;margin-top:18px" ${compra.lines.length?'':'disabled'}>${ICN.check} Registrar compra</button>
+      <div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn btn-ghost btn-sm" id="compraOC" style="flex:1">${ICN.compras} Traer de OC (F4)</button><button class="btn btn-ghost btn-sm" id="compraLimpiar" style="flex:1">Limpiar (F1)</button></div>
+      <div class="summ-row"><span>Subtotal</span><span>${money2(t.subtotal,mon)}</span></div>
+      <div class="summ-row"><span>IGV ${compra.conIGV?('('+Math.round(compra.igvRate*100)+'%)'):'(exonerado)'}</span><span>${money2(t.igv,mon)}</span></div>
+      <div class="summ-row total"><span>Total</span><span>${money2(t.total,mon)}</span></div>
+      ${mon==='US$'?`<div style="text-align:right;color:var(--ink-3);font-size:12px;margin-top:4px">≈ ${money(t.total*(Number(compra.tc)||1))} al TC ${compra.tc}</div>`:''}
+      <button class="btn btn-primary" id="emitCompra" style="width:100%;justify-content:center;margin-top:18px" ${compra.lines.length?'':'disabled'}>${ICN.check} Registrar compra (F6)</button>
     </div></div>`;
-  document.getElementById('selProdC').onchange=(e)=>{if(e.target.value){const p=DB.productos.find(x=>x.id===e.target.value);const ex=compra.lines.find(l=>l.prodId===e.target.value);if(ex)ex.cant++;else compra.lines.push({prodId:e.target.value,cant:1,costo:Number(p.costo)||0});drawCompra();}};
-  document.getElementById('compraProv').onchange=(e)=>compra.proveedor=e.target.value;
-  document.getElementById('compraMet').onchange=(e)=>compra.metodo=e.target.value;
+  // Buscador de productos (no re-renderiza al tipear; solo el dropdown):
+  const si=document.getElementById('cSearch'), box=document.getElementById('cResults');
+  si.oninput=()=>{ const q=si.value.trim(); if(!q){box.classList.remove('open');return;}
+    const res=buscarProductos(q,8);
+    box.innerHTML=res.map(p=>`<div class="gr-item" data-cp="${p.id}"><div><div class="cell-strong">${p.desc}</div><div class="cell-mono" style="color:var(--ink-3);font-size:11.5px">${p.codigo} · ${p.marca||''} · costo ${money2(p.costo,p.moneda||'S/')}</div></div></div>`).join('')||'<div style="padding:14px;color:var(--ink-3)">Sin resultados</div>';
+    box.classList.add('open');
+    box.querySelectorAll('[data-cp]').forEach(r=>r.onclick=()=>{ const p=DB.productos.find(x=>x.id===r.dataset.cp); const ex=compra.lines.find(l=>l.prodId===p.id); if(ex)ex.cant++; else compra.lines.push({prodId:p.id,cant:1,costo:Number(p.costo)||0}); box.classList.remove('open'); si.value=''; drawCompra(); });
+  };
+  const set=(id,ev,fn)=>{const e=document.getElementById(id);if(e)e[ev]=fn;};
+  set('cTipoDoc','onchange',e=>{compra.tipoDoc=e.target.value;});
+  set('compraProv','onchange',e=>{compra.proveedor=e.target.value;});
+  set('cSerie','onchange',e=>{compra.serie=e.target.value.trim();});
+  set('cNumero','onchange',e=>{compra.numero=e.target.value.trim();});
+  set('cMoneda','onchange',e=>{compra.moneda=e.target.value;drawCompra();});
+  set('cTC','onchange',e=>{compra.tc=Number(e.target.value)||tcActual();drawCompra();});
+  set('cIgvRate','onchange',e=>{compra.igvRate=Number(e.target.value);drawCompra();});
+  set('cConIGV','onchange',e=>{compra.conIGV=e.target.value==='1';drawCompra();});
+  set('cGuia','onchange',e=>{compra.guia=e.target.value.trim();});
+  set('cPeriodo','onchange',e=>{compra.periodo=e.target.value.trim();});
+  set('compraMet','onchange',e=>{compra.metodo=e.target.value;});
+  set('cCaja','onchange',e=>{compra.caja=e.target.value.trim();});
+  set('cEmision','onchange',e=>{compra.emision=e.target.value;});
+  set('cIngreso','onchange',e=>{compra.ingreso=e.target.value;});
+  set('cVcto','onchange',e=>{compra.vcto=e.target.value;});
+  set('compraOC','onclick',compraTraerOC);
+  set('compraLimpiar','onclick',()=>renderNuevaCompra());
   b.querySelectorAll('[data-cqty]').forEach(inp=>inp.onchange=()=>{let v=parseInt(inp.value)||1;if(v<1)v=1;compra.lines[inp.dataset.cqty].cant=v;drawCompra();});
   b.querySelectorAll('[data-ccost]').forEach(inp=>inp.onchange=()=>{compra.lines[inp.dataset.ccost].costo=parseFloat(inp.value)||0;drawCompra();});
   b.querySelectorAll('[data-crm]').forEach(x=>x.onclick=()=>{compra.lines.splice(x.dataset.crm,1);drawCompra();});
   const emit=document.getElementById('emitCompra'); if(emit&&compra.lines.length)emit.onclick=emitirCompra;
 }
+function compraTraerOC(){
+  const ocs=DB.ordenescompra.filter(o=>o.estado!=='Recibida' && o.proveedor===compra.proveedor);
+  if(!ocs.length){ toast('No hay órdenes de compra pendientes de '+(compra.proveedor||'ese proveedor'),'error'); return; }
+  openModal('Traer de Orden de Compra', `<div class="form-grid"><div class="field full"><label>Orden de compra pendiente</label><select id="ocPick">${ocs.map(o=>`<option value="${o.id}">${o.num} · ${money(o.total)} · ${o.items} ítems</option>`).join('')}</select></div></div>`, ()=>{
+    const o=DB.ordenescompra.find(x=>x.id===val('ocPick')); if(!o){toast('Selecciona una OC','error');return false;}
+    (o.lineas||[]).forEach(l=>{ if(l.prodId){ const ex=compra.lines.find(x=>x.prodId===l.prodId); if(ex) ex.cant+=Number(l.cant)||1; else compra.lines.push({prodId:l.prodId,cant:Number(l.cant)||1,costo:Number(l.costo)||0}); } });
+    compra.ocNum=o.num; drawCompra(); toast('Líneas traídas de '+o.num,'success'); return true;
+  });
+}
 async function emitirCompra(){
-  if(emitLock) return; emitLock=true; const btn=document.getElementById('emitCompra'); if(btn) btn.disabled=true;
-  const total=compra.lines.reduce((s,l)=>s+l.costo*l.cant,0);
+  if(emitLock) return;
+  if(!compra.lines.length){ toast('Agrega al menos un producto','error'); return; }
+  emitLock=true; const btn=document.getElementById('emitCompra'); if(btn) btn.disabled=true;
+  const t=compraTotales(compra.lines, compra.igvRate, compra.conIGV);
+  const numProv = (compra.serie||compra.numero) ? ((compra.serie?compra.serie:'')+(compra.serie&&compra.numero?'-':'')+(compra.numero||'')) : '';
   let num;
   try {
     await commit(()=>{
@@ -1825,14 +1899,18 @@ async function emitirCompra(){
       compra.lines.forEach(l=>{const p=DB.productos.find(x=>x.id===l.prodId);
         const stockPrev=Number(p.stock)||0, costoPrev=Number(p.costo)||0;
         addStock(p,l.cant);
-        // Costo promedio ponderado. Si aún no había costo, se establece con esta compra.
+        // Costo promedio ponderado sobre la BASE (sin IGV). Si no había costo, lo establece esta compra.
         p.costo = (costoPrev>0 && stockPrev>0) ? (stockPrev*costoPrev + l.cant*Number(l.costo)) / (stockPrev+l.cant) : Number(l.costo)||0;
-        recordMov(p,'COMPRA',num,l.cant,{razon:compra.proveedor,costo:Number(l.costo)||Number(p.costo)||0,tc:compra.tc,moneda:compra.moneda||'S/'});});
-      DB.compras.unshift({id:uid(),num,fecha:new Date().toISOString().slice(0,10),proveedor:compra.proveedor,items:compra.lines.reduce((s,l)=>s+l.cant,0),total,estado:compra.metodo==='Crédito'?'Pendiente':'Pagada',saldo:(compra.metodo==='Crédito'?total:0),abonado:(compra.metodo==='Crédito'?0:total),metodo:compra.metodo,usuario:usuarioActual(),creado:new Date().toISOString()});
+        recordMov(p,'COMPRA',numProv||num,l.cant,{razon:compra.proveedor,costo:Number(l.costo)||Number(p.costo)||0,tc:compra.tc,moneda:compra.moneda||'S/'});});
+      DB.compras.unshift({ id:uid(), num, numProv, tipoDoc:compra.tipoDoc, fecha:compra.emision||new Date().toISOString().slice(0,10),
+        ingreso:compra.ingreso, vcto:compra.vcto, periodo:compra.periodo, guia:compra.guia, moneda:compra.moneda, tc:compra.tc,
+        proveedor:compra.proveedor, items:compra.lines.reduce((s,l)=>s+l.cant,0), subtotal:t.subtotal, igv:t.igv, total:t.total,
+        estado:compra.metodo==='Crédito'?'Pendiente':'Pagada', saldo:(compra.metodo==='Crédito'?t.total:0), abonado:(compra.metodo==='Crédito'?0:t.total),
+        metodo:compra.metodo, ocNum:compra.ocNum||'', usuario:usuarioActual(), creado:new Date().toISOString() });
     });
   } catch(e){ emitLock=false; if(btn) btn.disabled=false; toast('No se pudo guardar la compra. Reintenta.','error'); return; }
   renderNav();
-  toast('Compra '+num+' registrada · stock actualizado','success');
+  toast('Compra '+num+(numProv?(' ('+numProv+')'):'')+' registrada · stock y costo actualizados','success');
   emitLock=false;
   document.querySelector('#segC button[data-t="lista"]').click();
 }
@@ -3567,6 +3645,12 @@ document.addEventListener('keydown',(e)=>{
   if(!SESSION) return;
   if(e.key==='F2'){ e.preventDefault(); go('ventas'); setTimeout(()=>{ const nb=document.querySelector('#segV button[data-t="nueva"]'); if(nb) nb.click(); },0); }
   if((e.ctrlKey||e.metaKey) && (e.key==='s'||e.key==='S')){ const btn=document.getElementById('emitBtn')||document.getElementById('emitCotiz')||document.getElementById('emitCompra')||document.getElementById('ncGrabar'); if(btn){ e.preventDefault(); if(!btn.disabled) btn.click(); } }
+  // Atajos del Registro de Compras (como en el SGAE): F1 Limpiar · F4 OC · F6 Grabar.
+  if(currentView==='facturacompra' && compra){
+    if(e.key==='F1'){ e.preventDefault(); renderNuevaCompra(); }
+    if(e.key==='F4'){ e.preventDefault(); const b=document.getElementById('compraOC'); if(b) b.click(); }
+    if(e.key==='F6'){ e.preventDefault(); const b=document.getElementById('emitCompra'); if(b && !b.disabled) b.click(); }
+  }
 });
 
 /* ================== AUTENTICACIÓN Y ROLES (Fase 2B) ================== */

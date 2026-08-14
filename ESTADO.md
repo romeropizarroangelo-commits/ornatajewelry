@@ -395,6 +395,25 @@ Con SCHEMA_VERSION al día (`cierres:[]`, `empresas:[]` en seed + normalize) y m
 
 ---
 
+## REGISTRO DE COMPRAS potente (2026-08-12)  [última de las 7 capturas del usuario]
+
+> Captura: "Registro de Compras Factura" del SGAE — tipo doc, proveedor, serie+número, moneda, TC, IGV con/sin, guía, período (202608), fechas emisión/ingreso/vcto, condición pago, caja, líneas con marca/UM, botones F1/F2/F4/F5/F6 y OC. Mi Factura de Compra era un formulario simple (proveedor + productos + contado/crédito).
+
+- ✅ **`compraTotales(lines, igvRate, conIGV)`** (puro, testeado): subtotal (Σ costo×cant), IGV (18/10/0% o exonerado), total. El **costo del inventario usa la BASE sin IGV** (el IGV de compras es crédito fiscal recuperable → no infla el costo); el total pagable SÍ incluye IGV.
+- ✅ **Formulario completo** (`renderNuevaCompra`/`drawCompra`): tipo doc, proveedor, **serie + número del proveedor** (`numProv`, para SUNAT), moneda + **TC** (con equivalencia en soles si es US$), **IGV % + Con/Sin IGV**, guía, **período tributario**, emisión/ingreso/vencimiento, condición de pago, caja. Líneas con **buscador** (código/nombre, escalable a 30k), columnas Código/Producto/Marca/Cant/UM/Costo/Importe. Resumen Subtotal/IGV/Total.
+- ✅ **Traer de OC** (`compraTraerOC`): carga las líneas de una Orden de Compra pendiente del proveedor. **Atajos** F1 (Limpiar), F4 (OC), F6 (Grabar), integrados en el handler global sin chocar con F2/Ctrl+S.
+- ✅ **Guardado** enriquecido: la compra guarda numProv, tipoDoc, período, guía, moneda, TC, subtotal, IGV, total, fechas; costo ponderado sobre la base; CxP/kardex ya conectados. Historial con columnas Doc. proveedor y Período.
+
+**Verificación:** `tests/compras.test.js` — 10/10 (IGV 18% de 250 = 45 → total 295; sin IGV → total = base; redondeo 99.99→117.99; base sin IGV para el costo; guarda subtotal/igv/total y numProv). **Suite total: 156/156.**
+
+**Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+**Estado:** ✅ **Las 7 pantallas del SGAE que el usuario mostró están replicadas y potenciadas** (Letras de Compra, CxP, CxC, Nota de Crédito, Registro de Compras, Kardex — y de paso el motor de cuentas corrientes). Pendientes menores anotados abajo.
+
+---
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.
