@@ -3259,6 +3259,8 @@ function landedCost(lineas, costos, factorPct){
     return Object.assign({}, l, { importeFob, prorrateo, landedTotal, landedUnit });
   });
 }
+// Precio de venta sugerido a partir del costo (aterrizado) y un margen %. PURO.
+function precioSugerido(costo, margenPct){ return Math.round((Number(costo)||0)*(1+(Number(margenPct)||0)/100)*100)/100; }
 /* Carga masiva de importación. Parseo CSV + Excel(.xlsx) nativo, y emparejado por código de fábrica. PUROS los 2 primeros. */
 function parseImportCSV(text){
   const rows=[]; String(text||'').split(/\r?\n/).forEach((line,idx)=>{
@@ -3344,7 +3346,7 @@ function renderImpLista(){
 function renderNuevaImp(){
   const hoy=new Date().toISOString().slice(0,10);
   imp={ proveedor:DB.proveedores[0]?.nombre||'', moneda:'$', tc:tcActual(), lines:[], costos:{flete:0,seguro:0,aduana:0,otros:0},
-    numero:'', tipoDoc:'Factura', emision:hoy, condicion:'Contado', igv:0.18, nroDua:'', fechaDua:hoy, factor:0, preimportacion:false, fechaLlegada:hoy, inconvenientes:[] };
+    numero:'', tipoDoc:'Factura', emision:hoy, condicion:'Contado', igv:0.18, nroDua:'', fechaDua:hoy, factor:0, preimportacion:false, fechaLlegada:hoy, inconvenientes:[], margen:40, actualizarPrecios:true };
   drawImp();
 }
 function drawImp(){
@@ -3371,8 +3373,10 @@ function drawImp(){
         <div class="field"><label>N° DUA</label><input id="imp_nroDua" value="${imp.nroDua||''}" placeholder="Declaración de Aduanas"></div>
         <div class="field"><label>Fecha DUA</label><input type="date" id="imp_fechaDua" value="${imp.fechaDua}"></div>
         <div class="field"><label>Factor % (recargo s/ FOB)</label><input id="imp_factor" type="number" step="0.01" value="${imp.factor||0}"></div>
+        <div class="field"><label>Margen % (precio sugerido)</label><input id="imp_margen" type="number" step="0.01" value="${imp.margen||0}"></div>
         <div class="field"><label>Fecha de llegada</label><input type="date" id="imp_fechaLlegada" value="${imp.fechaLlegada}"></div>
         <div class="field"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer"><input type="checkbox" id="imp_pre" ${imp.preimportacion?'checked':''}> Pre-importación</label></div>
+        <div class="field"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer"><input type="checkbox" id="imp_actprec" ${imp.actualizarPrecios?'checked':''}> Actualizar precio sugerido al recibir</label></div>
       </div>
       <div style="padding:0 16px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:14px">
         <button class="btn btn-primary" id="impCargar">${ICN.upload} Cargar archivo (Excel/CSV)</button>
@@ -3387,12 +3391,13 @@ function drawImp(){
     <div class="venta-layout">
     <div class="card"><div class="section-title">Productos importados (FOB)</div>
       <div style="padding:16px"><div class="line-add"><select class="filter-select" id="selProdImp" style="flex:1"><option value="">+ Agregar producto...</option>${DB.productos.slice(0,800).map(p=>`<option value="${p.id}">${p.codigo} · ${p.desc}</option>`).join('')}</select></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">FOB unit.</th><th style="text-align:right">Aterrizado unit.</th><th></th></tr></thead><tbody>
-      ${imp.lines.length?imp.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId);const cc=calc[i];return `<tr><td><div class="cell-strong">${p.desc}</div><div class="cell-mono">${p.codigo}</div></td>
+      <div class="table-wrap"><table><thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:right">FOB unit.</th><th style="text-align:right">Aterrizado unit.</th><th style="text-align:right">Precio sug. (${imp.margen||0}%)</th><th></th></tr></thead><tbody>
+      ${imp.lines.length?imp.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId);const cc=calc[i];const sug=precioSugerido(cc.landedUnit, imp.margen);return `<tr><td><div class="cell-strong">${p.desc}</div><div class="cell-mono">${p.codigo}</div></td>
         <td style="text-align:center"><input class="qty-input" type="number" min="1" value="${l.cant}" data-impq="${i}"/></td>
         <td style="text-align:right"><input class="qty-input" style="width:90px;text-align:right" type="number" step="0.01" value="${l.fob}" data-impf="${i}"/></td>
         <td style="text-align:right" class="cell-strong" style="color:var(--brand)">${money2(cc.landedUnit,sym)}</td>
-        <td><div class="row-actions"><button class="icon-btn del" data-imprm="${i}">${ICN.del}</button></div></td></tr>`;}).join(''):`<tr><td colspan="5" class="empty" style="padding:40px">${ICN.box}<h3>Sin productos</h3><p>Agrega los productos que importas con su costo FOB.</p></td></tr>`}
+        <td style="text-align:right" class="cell-strong" style="color:var(--green)">${money2(sug,sym)}</td>
+        <td><div class="row-actions"><button class="icon-btn del" data-imprm="${i}">${ICN.del}</button></div></td></tr>`;}).join(''):`<tr><td colspan="6" class="empty" style="padding:40px">${ICN.box}<h3>Sin productos</h3><p>Agrega los productos que importas con su costo FOB.</p></td></tr>`}
       </tbody></table></div></div>
     <div class="card cart-summary">
       <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-2);margin:2px 0 10px">Costos de importación (${sym})</div>
@@ -3421,8 +3426,10 @@ function drawImp(){
   set('imp_nroDua','onchange',(e)=>{imp.nroDua=e.target.value.trim();});
   set('imp_fechaDua','onchange',(e)=>{imp.fechaDua=e.target.value;});
   set('imp_factor','onchange',(e)=>{imp.factor=parseFloat(e.target.value)||0;drawImp();});
+  set('imp_margen','onchange',(e)=>{imp.margen=parseFloat(e.target.value)||0;drawImp();});
   set('imp_fechaLlegada','onchange',(e)=>{imp.fechaLlegada=e.target.value;});
   set('imp_pre','onchange',(e)=>{imp.preimportacion=e.target.checked;});
+  set('imp_actprec','onchange',(e)=>{imp.actualizarPrecios=e.target.checked;});
   set('impCargar','onclick',()=>{ const f=document.getElementById('impFile'); if(f) f.click(); });
   set('impFile','onchange',(e)=>loadImportFile(e.target.files&&e.target.files[0]));
   ['flete','seguro','aduana','otros'].forEach(k=>{ set('imp_'+k,'onchange',(e)=>{imp.costos[k]=parseFloat(e.target.value)||0;drawImp();}); });
@@ -3436,15 +3443,15 @@ async function grabarImp(){
   const calc=landedCost(imp.lines.map(l=>({fob:l.fob,cant:l.cant})), imp.costos, imp.factor);
   const totalLanded=calc.reduce((s,l)=>s+l.landedTotal,0);
   const num='IMP-'+String(1000+DB.importaciones.length+1);
-  const lineas=imp.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId);return {prodId:l.prodId,codigo:p.codigo,desc:p.desc,cant:l.cant,fob:l.fob,landedUnit:calc[i].landedUnit};});
-  DB.importaciones.unshift({id:uid(),num,fecha:imp.emision||new Date().toISOString().slice(0,10),proveedor:imp.proveedor,moneda:imp.moneda,tc:imp.tc,costos:Object.assign({},imp.costos),factor:imp.factor,numProv:imp.numero,tipoDoc:imp.tipoDoc,nroDua:imp.nroDua,fechaDua:imp.fechaDua,igv:imp.igv,condicion:imp.condicion,preimportacion:imp.preimportacion,fechaLlegada:imp.fechaLlegada,items:imp.lines.reduce((s,l)=>s+l.cant,0),totalLanded,estado:'En tránsito',usuario:usuarioActual(),creado:new Date().toISOString(),lineas});
+  const lineas=imp.lines.map((l,i)=>{const p=DB.productos.find(x=>x.id===l.prodId);return {prodId:l.prodId,codigo:p.codigo,desc:p.desc,cant:l.cant,fob:l.fob,landedUnit:calc[i].landedUnit,precioSugUnit:precioSugerido(calc[i].landedUnit, imp.margen)};});
+  DB.importaciones.unshift({id:uid(),num,fecha:imp.emision||new Date().toISOString().slice(0,10),proveedor:imp.proveedor,moneda:imp.moneda,tc:imp.tc,costos:Object.assign({},imp.costos),factor:imp.factor,margen:imp.margen,actualizarPrecios:imp.actualizarPrecios,numProv:imp.numero,tipoDoc:imp.tipoDoc,nroDua:imp.nroDua,fechaDua:imp.fechaDua,igv:imp.igv,condicion:imp.condicion,preimportacion:imp.preimportacion,fechaLlegada:imp.fechaLlegada,items:imp.lines.reduce((s,l)=>s+l.cant,0),totalLanded,estado:'En tránsito',usuario:usuarioActual(),creado:new Date().toISOString(),lineas});
   try{await persist();}catch(e){emitLock=false;if(btn)btn.disabled=false;toast('No se pudo guardar','error');return;}
   toast('Importación '+num+' grabada','success'); emitLock=false;
   document.querySelector('#segImp button[data-t="lista"]').click();
 }
 function recibirImp(id){
   const o=DB.importaciones.find(x=>x.id===id); if(!o||o.estado==='Recibida') return;
-  confirmDialog('¿Recibir la importación '+o.num+'?','Ingresará el stock con el COSTO ATERRIZADO (promedio ponderado) y la marcará como Recibida.',async ()=>{
+  confirmDialog('¿Recibir la importación '+o.num+'?','Ingresará el stock con el COSTO ATERRIZADO (promedio ponderado)'+(o.actualizarPrecios?', actualizará el PRECIO SUGERIDO de cada producto (costo + '+(o.margen||0)+'%)':'')+' y la marcará como Recibida.',async ()=>{
     try{
       await commit(()=>{
         (o.lineas||[]).forEach(l=>{ if(l.prodId){ const p=DB.productos.find(x=>x.id===l.prodId); if(p){
@@ -3452,6 +3459,7 @@ function recibirImp(id){
           const landedEnProducto=convMoneda(l.landedUnit, o.moneda, p.moneda, o.tc);
           addStock(p,l.cant);
           p.costo=(costoPrev>0&&stockPrev>0)?(stockPrev*costoPrev+l.cant*landedEnProducto)/(stockPrev+l.cant):landedEnProducto;
+          if(o.actualizarPrecios && l.precioSugUnit){ p.precioSug=Math.round(convMoneda(l.precioSugUnit, o.moneda, p.moneda, o.tc)*100)/100; }
           recordMov(p,'IMPORTACION',o.num,l.cant,{razon:o.proveedor||'Importación',costo:landedEnProducto,moneda:p.moneda||'S/'});
         } } });
         const oo=DB.importaciones.find(x=>x.id===id); if(oo) oo.estado='Recibida';

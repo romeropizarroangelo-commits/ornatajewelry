@@ -53,6 +53,13 @@ const near=(a,b)=>Math.abs(a-b)<1e-6;
   ok(near(r[0].landedUnit,130), 'Factor 10% (+100) + flete 200 → 300/10 = +30/u → 130/u');
   ok(near(landedCost([{fob:50,cant:4}], {}, 0)[0].landedUnit,50), 'Factor 0 no cambia nada (compatibilidad)');
 
+  console.log('\n[2b] Precio de venta sugerido (costo aterrizado + margen %)');
+  eval(extractFn('precioSugerido'));
+  ok(near(precioSugerido(100,40),140), 'costo 100 + margen 40% = 140');
+  ok(near(precioSugerido(12.5,60),20), 'costo 12.50 + 60% = 20.00');
+  ok(near(precioSugerido(33.33,50),50), 'redondea a 2 decimales (33.33×1.5 = 49.995 → 50.00)');
+  ok(near(precioSugerido(80,0),80), 'margen 0 → precio = costo');
+
   console.log('\n[3] Carga masiva: parseImportCSV');
   eval(extractFn('parseImportCSV'));
   let rows=parseImportCSV('codigo,cantidad,fob\nW712/75,10,3.50\nBKR6E,24,1.20\n');
