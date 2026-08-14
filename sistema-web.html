@@ -884,7 +884,7 @@ VIEWS.productos = (el) => {
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost" id="impBtn">${ICN.upload} Importar</button>
         <button class="btn btn-ghost" id="expBtn">${ICN.download} Exportar</button>
-        <button class="btn btn-primary" id="addBtn">${ICN.plus} Nuevo producto</button>
+        ${pgate('productos','registrar',`<button class="btn btn-primary" id="addBtn">${ICN.plus} Nuevo producto</button>`)}
       </div>
     </div>
     <div class="card">
@@ -904,7 +904,7 @@ VIEWS.productos = (el) => {
     </div>
     <input type="file" id="fileInput" accept=".csv" class="hidden"/>`;
 
-  document.getElementById('addBtn').onclick = ()=>productModal();
+  const addProdBtn=document.getElementById('addBtn'); if(addProdBtn) addProdBtn.onclick = ()=>productModal();
   document.getElementById('expBtn').onclick = exportProductos;
   document.getElementById('impBtn').onclick = ()=>document.getElementById('fileInput').click();
   document.getElementById('fileInput').onchange = importProductos;
@@ -960,8 +960,8 @@ function renderProdTable() {
             <td style="text-align:center">${stockBadge(p)}</td>
             <td style="white-space:nowrap;width:1%"><div class="row-actions">
               <button class="icon-btn" title="Ver ficha" data-view2="${p.id}">${ICN.eye}</button>
-              <button class="icon-btn" title="Editar" data-edit="${p.id}">${ICN.edit}</button>
-              <button class="icon-btn del" title="Eliminar" data-del="${p.id}">${ICN.del}</button>
+              ${pgate('productos','editar',`<button class="icon-btn" title="Editar" data-edit="${p.id}">${ICN.edit}</button>`)}
+              ${pgate('productos','eliminar',`<button class="icon-btn del" title="Eliminar" data-del="${p.id}">${ICN.del}</button>`)}
             </div></td>
           </tr>`).join('')}
       </tbody>
@@ -1105,7 +1105,7 @@ VIEWS.clientes = (el) => {
   el.innerHTML = `
     <div class="page-head">
       <div><h1>Clientes</h1><p>${DB.clientes.length} clientes registrados</p></div>
-      <button class="btn btn-primary" id="addCli">${ICN.plus} Nuevo cliente</button>
+      ${pgate('clientes','registrar',`<button class="btn btn-primary" id="addCli">${ICN.plus} Nuevo cliente</button>`)}
     </div>
     <div class="card">
       <div style="padding:16px;border-bottom:1px solid var(--line)">
@@ -1114,7 +1114,7 @@ VIEWS.clientes = (el) => {
       </div>
       <div class="table-wrap" id="cliTable"></div>
     </div>`;
-  document.getElementById('addCli').onclick=()=>clienteModal();
+  const addCliBtn=document.getElementById('addCli'); if(addCliBtn) addCliBtn.onclick=()=>clienteModal();
   const cq=document.getElementById('cq'); cq.oninput=()=>{cliQ=cq.value;renderCliTable();};
   renderCliTable();
 };
@@ -1132,7 +1132,7 @@ function renderCliTable(){
       <td>${c.vendedor||'—'}</td><td>${c.distrito||'—'}</td>
       <td style="text-align:right">${credLabel(c)}</td>
       <td style="text-align:center">${(c.estado==='Inactivo')?'<span class="badge badge-red">Inactivo</span>':'<span class="badge badge-green">Activo</span>'}</td>
-      <td><div class="row-actions"><button class="icon-btn" data-edit="${c.id}">${ICN.edit}</button><button class="icon-btn del" data-del="${c.id}">${ICN.del}</button></div></td>
+      <td><div class="row-actions">${pgate('clientes','editar',`<button class="icon-btn" data-edit="${c.id}">${ICN.edit}</button>`)}${pgate('clientes','eliminar',`<button class="icon-btn del" data-del="${c.id}">${ICN.del}</button>`)}</div></td>
     </tr>`).join('')}</tbody></table>`;
   wrap.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>clienteModal(b.dataset.edit));
   wrap.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDialog('¿Eliminar cliente?','',()=>{DB.clientes=DB.clientes.filter(x=>x.id!==b.dataset.del);save();renderCliTable();renderNav();toast('Cliente eliminado','success');}));
@@ -1208,12 +1208,12 @@ let provQ='';
 VIEWS.proveedores=(el)=>{
   el.innerHTML=`
     <div class="page-head"><div><h1>Proveedores</h1><p>${DB.proveedores.length} proveedores</p></div>
-      <button class="btn btn-primary" id="addProv">${ICN.plus} Nuevo proveedor</button></div>
+      ${pgate('proveedores','registrar',`<button class="btn btn-primary" id="addProv">${ICN.plus} Nuevo proveedor</button>`)}</div>
     <div class="card"><div style="padding:16px;border-bottom:1px solid var(--line)">
       <div class="search" style="width:340px;max-width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input id="vq" placeholder="Buscar proveedor..." value="${provQ}"/></div></div>
       <div class="table-wrap" id="provTable"></div></div>`;
-  document.getElementById('addProv').onclick=()=>provModal();
+  const addProvBtn=document.getElementById('addProv'); if(addProvBtn) addProvBtn.onclick=()=>provModal();
   const vq=document.getElementById('vq');vq.oninput=()=>{provQ=vq.value;renderProvTable();};
   renderProvTable();
 };
@@ -1226,7 +1226,7 @@ function renderProvTable(){
     ${list.map(p=>`<tr><td><div class="prod-cell"><div class="thumb" style="background:var(--purple-soft);color:var(--purple)">${(p.nombre||'?').charAt(0)}</div>
       <div><div class="cell-strong">${p.nombre}</div><div style="color:var(--ink-3);font-size:12px">${p.email||''}</div></div></div></td>
       <td class="cell-mono">${p.doc||'—'}</td><td>${p.contacto||'—'}</td><td class="cell-mono">${p.tel||'—'}</td>
-      <td><div class="row-actions"><button class="icon-btn" data-edit="${p.id}">${ICN.edit}</button><button class="icon-btn del" data-del="${p.id}">${ICN.del}</button></div></td></tr>`).join('')}
+      <td><div class="row-actions">${pgate('proveedores','editar',`<button class="icon-btn" data-edit="${p.id}">${ICN.edit}</button>`)}${pgate('proveedores','eliminar',`<button class="icon-btn del" data-del="${p.id}">${ICN.del}</button>`)}</div></td></tr>`).join('')}
     </tbody></table>`;
   wrap.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>provModal(b.dataset.edit));
   wrap.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDialog('¿Eliminar proveedor?','',()=>{DB.proveedores=DB.proveedores.filter(x=>x.id!==b.dataset.del);save();renderProvTable();renderNav();toast('Proveedor eliminado','success');}));

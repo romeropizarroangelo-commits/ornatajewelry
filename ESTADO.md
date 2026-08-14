@@ -492,7 +492,7 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 - ✅ **Aplicado de verdad**: el **menú** (`visible`) y **`go()`** ahora gatean por `puede(view,'ver')` por usuario (antes era el binario `ADMIN_VIEWS`). El permiso **Anular** se aplica en Ventas. La función **Ver costos** se conecta al ocultamiento de costos (CSS `.rol-vendedor:not(.ver-costo)`), así un vendedor con ese permiso ve costos.
 - ✅ **UI Perfiles**: selector de usuario + mostrar inactivos + Nuevo/Editar/Eliminar; para un vendedor, **matriz** por sección de menú (Consultar/Registrar/Editar/Eliminar/Anular por página) + **funciones especiales**; guarda al instante; para un admin muestra "acceso total".
 
-**Nota de alcance:** hoy se **aplica** el permiso de acceso (`ver`) en todo el sistema + `anular` en ventas + `verCosto`. Los demás (registrar/editar/eliminar por página) quedan **guardados y disponibles** vía `puede()` para engancharse módulo a módulo de forma incremental (evita un refactor masivo y riesgoso de una vez).
+**Nota de alcance:** se **aplica** el permiso de acceso (`ver`) en todo el sistema + `anular` en ventas + `verCosto`. **Registrar/Editar/Eliminar ya se aplican en los Maestros** (Clientes, Proveedores, Productos) vía el helper `pgate(view,accion,html)` que oculta los botones Nuevo/Editar/Eliminar según permiso (con guardas en los `onclick`). El resto de módulos se engancha igual, incremental, cuando el usuario lo pida (evita un refactor masivo de una vez).
 
 **Verificación:** `tests/perfiles.test.js` — 10/10 (herencia por rol; la matriz explícita manda; acciones no definidas heredan). **Suite total: 182/182.**
 
