@@ -1048,6 +1048,7 @@ function productModal(id) {
       <div class="field"><label>Marca</label><input id="f_marca" value="${p.marca||''}"/></div>
       <div class="field"><label>Línea</label><input id="f_linea" value="${p.linea||''}"/></div>
       <div class="field"><label>Origen</label><input id="f_origen" value="${p.origen||''}"/></div>
+      <div class="field"><label>Proveedor habitual</label><select id="f_proveedor"><option value="">— Ninguno —</option>${DB.proveedores.map(pr=>`<option ${p.proveedor===pr.nombre?'selected':''}>${pr.nombre}</option>`).join('')}</select></div>
       <div class="field"><label>Unidad de medida</label>
         <select id="f_um">${['UND','JGO','CAJ','MTR','KG','LT'].map(u=>`<option ${p.um===u?'selected':''}>${u}</option>`).join('')}</select></div>
       <div class="field solo-admin"><label>Costo</label><input id="f_costo" type="number" step="0.01" value="${p.costo||''}"/></div>
@@ -1072,7 +1073,7 @@ function productModal(id) {
     if(!codigo||!desc){ toast('Código y descripción son obligatorios','error'); return false; }
     const pri=parseInt(val('f_pri'))||0, cie=parseInt(val('f_cie'))||0, vit=parseInt(val('f_vit'))||0, mer=parseInt(val('f_mer'))||0;
     const partNumbers=(document.getElementById('f_partnumbers').value||'').split('\n').map(s=>s.trim()).filter(Boolean).map(numero=>({numero,tipo:'Alternativo'}));
-    const data = { codigo, codFab:val('f_codFab'), desc, marca:val('f_marca'), linea:val('f_linea'), origen:val('f_origen'),
+    const data = { codigo, codFab:val('f_codFab'), desc, marca:val('f_marca'), linea:val('f_linea'), origen:val('f_origen'), proveedor:val('f_proveedor'),
       um:val('f_um'), costo:parseFloat(val('f_costo'))||0, moneda:val('f_moneda'), precio:parseFloat(precio)||0,
       precioSug:parseFloat(val('f_precioSug'))||0, precioMayor:parseFloat(val('f_precioMayor'))||0, precioTaller:parseFloat(val('f_precioTaller'))||0, precioFlota:parseFloat(val('f_precioFlota'))||0,
       ubicacion:val('f_ubicacion'), stock:pri+cie+vit, stockMin:parseInt(val('f_stockMin'))||0, pri, cie, vit, mer, partNumbers };

@@ -1055,6 +1055,7 @@ function productModal(id) {
       <div class="field"><label>Marca</label><input id="f_marca" value="${p.marca||''}"/></div>
       <div class="field"><label>Línea</label><input id="f_linea" value="${p.linea||''}"/></div>
       <div class="field"><label>Origen</label><input id="f_origen" value="${p.origen||''}"/></div>
+      <div class="field"><label>Proveedor habitual</label><select id="f_proveedor"><option value="">— Ninguno —</option>${DB.proveedores.map(pr=>`<option ${p.proveedor===pr.nombre?'selected':''}>${pr.nombre}</option>`).join('')}</select></div>
       <div class="field"><label>Unidad de medida</label>
         <select id="f_um">${['UND','JGO','CAJ','MTR','KG','LT'].map(u=>`<option ${p.um===u?'selected':''}>${u}</option>`).join('')}</select></div>
       <div class="field solo-admin"><label>Costo</label><input id="f_costo" type="number" step="0.01" value="${p.costo||''}"/></div>
@@ -1079,7 +1080,7 @@ function productModal(id) {
     if(!codigo||!desc){ toast('Código y descripción son obligatorios','error'); return false; }
     const pri=parseInt(val('f_pri'))||0, cie=parseInt(val('f_cie'))||0, vit=parseInt(val('f_vit'))||0, mer=parseInt(val('f_mer'))||0;
     const partNumbers=(document.getElementById('f_partnumbers').value||'').split('\n').map(s=>s.trim()).filter(Boolean).map(numero=>({numero,tipo:'Alternativo'}));
-    const data = { codigo, codFab:val('f_codFab'), desc, marca:val('f_marca'), linea:val('f_linea'), origen:val('f_origen'),
+    const data = { codigo, codFab:val('f_codFab'), desc, marca:val('f_marca'), linea:val('f_linea'), origen:val('f_origen'), proveedor:val('f_proveedor'),
       um:val('f_um'), costo:parseFloat(val('f_costo'))||0, moneda:val('f_moneda'), precio:parseFloat(precio)||0,
       precioSug:parseFloat(val('f_precioSug'))||0, precioMayor:parseFloat(val('f_precioMayor'))||0, precioTaller:parseFloat(val('f_precioTaller'))||0, precioFlota:parseFloat(val('f_precioFlota'))||0,
       ubicacion:val('f_ubicacion'), stock:pri+cie+vit, stockMin:parseInt(val('f_stockMin'))||0, pri, cie, vit, mer, partNumbers };
@@ -3122,38 +3123,42 @@ function sugerenciaReposicion(productos, factor){
     const disp=(Number(p.stock)||0)-(Number(p.reservado)||0);
     if(disp>min) return;
     const objetivo=Math.round(min*factor), sugerido=Math.max(0, objetivo-disp), costo=Number(p.costo)||0;
-    out.push({ id:p.id, codigo:p.codigo, desc:p.desc, marca:p.marca||'', linea:p.linea||'', stock:Number(p.stock)||0, disponible:disp, min, sugerido, costo, moneda:p.moneda||'S/', valorEstimado:Math.round(sugerido*costo*100)/100 });
+    out.push({ id:p.id, codigo:p.codigo, desc:p.desc, marca:p.marca||'', linea:p.linea||'', proveedor:p.proveedor||'', stock:Number(p.stock)||0, disponible:disp, min, sugerido, costo, moneda:p.moneda||'S/', valorEstimado:Math.round(sugerido*costo*100)/100 });
   });
   return out.sort((a,b)=>b.valorEstimado-a.valorEstimado);
 }
-let repoFactor=2, repoQ='';
+let repoFactor=2, repoQ='', repoProv='';
 VIEWS.reposicion=(el)=>{
   let list=sugerenciaReposicion(DB.productos, repoFactor);
+  const provsConDeficit=[...new Set(list.map(x=>x.proveedor).filter(Boolean))].sort();
   const q=repoQ.toLowerCase().trim();
-  if(q) list=list.filter(x=>[x.codigo,x.desc,x.marca,x.linea].some(v=>String(v||'').toLowerCase().includes(q)));
+  if(q) list=list.filter(x=>[x.codigo,x.desc,x.marca,x.linea,x.proveedor].some(v=>String(v||'').toLowerCase().includes(q)));
+  if(repoProv) list=list.filter(x=>x.proveedor===repoProv);
   const totalItems=list.length, totalUnid=list.reduce((s,x)=>s+x.sugerido,0), valor=R2(list.reduce((s,x)=>s+x.valorEstimado,0));
   const agotados=list.filter(x=>x.disponible<=0).length;
   el.innerHTML=`<div class="page-head"><div><h1>Reposición / Compras Sugeridas</h1><p>Productos en o por debajo del stock mínimo</p></div>
     ${list.length?`<div style="display:flex;gap:10px"><button class="btn btn-ghost" id="repExp">${ICN.download} Exportar</button><button class="btn btn-ghost" id="repPrint">${ICN.print} Imprimir</button>${puede('ordencompra','registrar')?`<button class="btn btn-primary" id="repOC">${ICN.compras} Generar Orden de Compra</button>`:''}</div>`:''}</div>
     <div class="card" style="margin-bottom:18px"><div style="padding:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
-      <div class="search" style="width:300px;max-width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="repq" placeholder="Filtrar por código, marca, línea..." value="${(repoQ||'').replace(/"/g,'&quot;')}"></div>
-      <div class="field" style="margin:0;min-width:170px"><label>Reponer hasta (× mínimo)</label><select id="repFactor"><option value="1" ${repoFactor==1?'selected':''}>1× (llegar al mínimo)</option><option value="1.5" ${repoFactor==1.5?'selected':''}>1.5×</option><option value="2" ${repoFactor==2?'selected':''}>2×</option><option value="3" ${repoFactor==3?'selected':''}>3×</option></select></div>
+      <div class="search" style="width:280px;max-width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="repq" placeholder="Filtrar por código, marca, línea..." value="${(repoQ||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field" style="margin:0;min-width:200px"><label>Proveedor</label><select id="repProv"><option value="">— Todos —</option>${provsConDeficit.map(pr=>`<option ${repoProv===pr?'selected':''}>${pr}</option>`).join('')}</select></div>
+      <div class="field" style="margin:0;min-width:160px"><label>Reponer hasta (× mínimo)</label><select id="repFactor"><option value="1" ${repoFactor==1?'selected':''}>1× (llegar al mínimo)</option><option value="1.5" ${repoFactor==1.5?'selected':''}>1.5×</option><option value="2" ${repoFactor==2?'selected':''}>2×</option><option value="3" ${repoFactor==3?'selected':''}>3×</option></select></div>
     </div></div>
     <div class="kpi-grid" style="margin-bottom:18px">
       ${kpiCard('alert', totalItems?'var(--red)':'var(--green)', totalItems?'var(--red-soft)':'var(--green-soft)','Productos a reponer',totalItems, agotados+' agotados', totalItems?false:null)}
       ${kpiCard('box','var(--purple)','var(--purple-soft)','Unidades sugeridas',totalUnid.toLocaleString('es-PE'),'a comprar',null)}
       ${kpiCard('money','var(--brand)','var(--brand-soft)','Inversión estimada',money(valor),'a costo',null)}
     </div>
-    <div class="card"><div class="table-wrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th style="text-align:center">Stock</th><th style="text-align:center">Disp.</th><th style="text-align:center">Mín.</th><th style="text-align:center">Sugerido</th><th style="text-align:right">Costo</th><th style="text-align:right">Inversión</th></tr></thead><tbody>
-      ${list.map(x=>`<tr><td class="cell-mono cell-strong">${x.codigo}</td><td class="cell-strong">${x.desc}</td><td>${x.marca||'—'}</td>
-        <td style="text-align:center">${x.stock}</td><td style="text-align:center"><span style="color:${x.disponible<=0?'var(--red)':'var(--amber)'};font-weight:700">${x.disponible}</span></td><td style="text-align:center">${x.min}</td>
-        <td style="text-align:center;color:var(--brand)" class="cell-strong">${x.sugerido}</td><td style="text-align:right" class="cell-mono">${money2(x.costo,x.moneda)}</td><td style="text-align:right" class="cell-strong">${money(x.valorEstimado)}</td></tr>`).join('')||`<tr><td colspan="9" class="empty" style="padding:40px">✅ Ningún producto está por debajo del mínimo.</td></tr>`}
-      </tbody>${list.length?`<tfoot><tr><td colspan="6" class="cell-strong">TOTAL (${totalItems} productos)</td><td style="text-align:center" class="cell-strong">${totalUnid}</td><td></td><td style="text-align:right" class="cell-strong">${money(valor)}</td></tr></tfoot>`:''}</table></div></div>`;
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Proveedor</th><th style="text-align:center">Disp.</th><th style="text-align:center">Mín.</th><th style="text-align:center">Sugerido</th><th style="text-align:right">Costo</th><th style="text-align:right">Inversión</th></tr></thead><tbody>
+      ${list.map(x=>`<tr><td class="cell-mono cell-strong">${x.codigo}</td><td class="cell-strong">${x.desc}<div class="cell-mono" style="color:var(--ink-3);font-size:11px">${x.marca||''}</div></td><td>${x.proveedor||'<span style="color:var(--ink-3)">— sin asignar —</span>'}</td>
+        <td style="text-align:center"><span style="color:${x.disponible<=0?'var(--red)':'var(--amber)'};font-weight:700">${x.disponible}</span></td><td style="text-align:center">${x.min}</td>
+        <td style="text-align:center;color:var(--brand)" class="cell-strong">${x.sugerido}</td><td style="text-align:right" class="cell-mono">${money2(x.costo,x.moneda)}</td><td style="text-align:right" class="cell-strong">${money(x.valorEstimado)}</td></tr>`).join('')||`<tr><td colspan="8" class="empty" style="padding:40px">✅ Ningún producto está por debajo del mínimo.</td></tr>`}
+      </tbody>${list.length?`<tfoot><tr><td colspan="5" class="cell-strong">TOTAL (${totalItems} productos)</td><td style="text-align:center" class="cell-strong">${totalUnid}</td><td></td><td style="text-align:right" class="cell-strong">${money(valor)}</td></tr></tfoot>`:''}</table></div></div>`;
   const rq=document.getElementById('repq'); if(rq) rq.oninput=()=>{repoQ=rq.value; const cur=rq.selectionStart; renderReposFast(); };
   const rf=document.getElementById('repFactor'); if(rf) rf.onchange=e=>{repoFactor=Number(e.target.value)||2; go('reposicion');};
+  const rp=document.getElementById('repProv'); if(rp) rp.onchange=e=>{repoProv=e.target.value; go('reposicion');};
   const ex=document.getElementById('repExp'); if(ex) ex.onclick=()=>{ const rows=[['codigo','producto','marca','stock','disponible','minimo','sugerido','costo','inversion'].join(',')].concat(list.map(x=>[csvCell(x.codigo),csvCell(x.desc),csvCell(x.marca),x.stock,x.disponible,x.min,x.sugerido,x.costo,x.valorEstimado].join(','))); downloadCSV('reposicion.csv',rows.join('\n')); toast('Exportado','success'); };
   const pb=document.getElementById('repPrint'); if(pb) pb.onclick=()=>printReposicion(list, totalUnid, valor);
-  const ocb=document.getElementById('repOC'); if(ocb) ocb.onclick=()=>generarOCDesde(list);
+  const ocb=document.getElementById('repOC'); if(ocb) ocb.onclick=()=>generarOCDesde(list, repoProv);
 };
 function renderReposFast(){ const el=document.getElementById('view'); if(el) VIEWS.reposicion(el); const rq=document.getElementById('repq'); if(rq){ rq.focus(); rq.setSelectionRange(rq.value.length,rq.value.length); } }
 function printReposicion(list, totalUnid, valor){
@@ -3244,15 +3249,15 @@ VIEWS.ordencompra=(el)=>{
     <div class="segmented" id="segOC"><button data-t="lista" class="${abrirNueva?'':'active'}">Historial</button>${pgate('ordencompra','registrar',`<button data-t="nueva" class="${abrirNueva?'active':''}">Nueva orden</button>`)}</div></div>
     <div id="ocBody"></div>`;
   el.querySelectorAll('#segOC button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#segOC button').forEach(x=>x.classList.remove('active'));b.classList.add('active');b.dataset.t==='nueva'?renderNuevaOC():renderOCLista();});
-  if(abrirNueva){ oc={proveedor:DB.proveedores[0]?.nombre||'', lines:preload}; drawOC(); toast(preload.length+' producto(s) sugerido(s) precargado(s) — elige el proveedor y graba','success'); }
+  if(abrirNueva){ oc={proveedor:preload.proveedor||DB.proveedores[0]?.nombre||'', lines:preload.lines||preload}; drawOC(); toast((preload.lines||preload).length+' producto(s) sugerido(s) precargado(s) — revisa y graba','success'); }
   else renderOCLista();
 };
-// Genera una Orden de Compra precargada con una lista de reposición (items {id,sugerido,costo}).
-function generarOCDesde(items){
+// Genera una Orden de Compra precargada con una lista de reposición (items {id,sugerido,costo}). Opcional: proveedor a preseleccionar.
+function generarOCDesde(items, proveedor){
   if(!puede('ordencompra','registrar')){ toast('No tienes permiso para crear órdenes de compra','error'); return; }
   const lines=(items||[]).filter(x=>x.sugerido>0).map(x=>({prodId:x.id, cant:x.sugerido, costo:Number(x.costo)||0}));
   if(!lines.length){ toast('No hay productos que reponer','error'); return; }
-  ocPreload=lines; go('ordencompra');
+  ocPreload={ lines, proveedor:proveedor||'' }; go('ordencompra');
 }
 function renderOCLista(){
   const b=document.getElementById('ocBody');
