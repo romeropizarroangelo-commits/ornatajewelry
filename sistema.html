@@ -3134,7 +3134,7 @@ VIEWS.reposicion=(el)=>{
   const totalItems=list.length, totalUnid=list.reduce((s,x)=>s+x.sugerido,0), valor=R2(list.reduce((s,x)=>s+x.valorEstimado,0));
   const agotados=list.filter(x=>x.disponible<=0).length;
   el.innerHTML=`<div class="page-head"><div><h1>Reposición / Compras Sugeridas</h1><p>Productos en o por debajo del stock mínimo</p></div>
-    ${list.length?`<div style="display:flex;gap:10px"><button class="btn btn-ghost" id="repExp">${ICN.download} Exportar</button><button class="btn btn-primary" id="repPrint">${ICN.print} Imprimir</button></div>`:''}</div>
+    ${list.length?`<div style="display:flex;gap:10px"><button class="btn btn-ghost" id="repExp">${ICN.download} Exportar</button><button class="btn btn-ghost" id="repPrint">${ICN.print} Imprimir</button>${puede('ordencompra','registrar')?`<button class="btn btn-primary" id="repOC">${ICN.compras} Generar Orden de Compra</button>`:''}</div>`:''}</div>
     <div class="card" style="margin-bottom:18px"><div style="padding:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
       <div class="search" style="width:300px;max-width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="repq" placeholder="Filtrar por código, marca, línea..." value="${(repoQ||'').replace(/"/g,'&quot;')}"></div>
       <div class="field" style="margin:0;min-width:170px"><label>Reponer hasta (× mínimo)</label><select id="repFactor"><option value="1" ${repoFactor==1?'selected':''}>1× (llegar al mínimo)</option><option value="1.5" ${repoFactor==1.5?'selected':''}>1.5×</option><option value="2" ${repoFactor==2?'selected':''}>2×</option><option value="3" ${repoFactor==3?'selected':''}>3×</option></select></div>
@@ -3153,6 +3153,7 @@ VIEWS.reposicion=(el)=>{
   const rf=document.getElementById('repFactor'); if(rf) rf.onchange=e=>{repoFactor=Number(e.target.value)||2; go('reposicion');};
   const ex=document.getElementById('repExp'); if(ex) ex.onclick=()=>{ const rows=[['codigo','producto','marca','stock','disponible','minimo','sugerido','costo','inversion'].join(',')].concat(list.map(x=>[csvCell(x.codigo),csvCell(x.desc),csvCell(x.marca),x.stock,x.disponible,x.min,x.sugerido,x.costo,x.valorEstimado].join(','))); downloadCSV('reposicion.csv',rows.join('\n')); toast('Exportado','success'); };
   const pb=document.getElementById('repPrint'); if(pb) pb.onclick=()=>printReposicion(list, totalUnid, valor);
+  const ocb=document.getElementById('repOC'); if(ocb) ocb.onclick=()=>generarOCDesde(list);
 };
 function renderReposFast(){ const el=document.getElementById('view'); if(el) VIEWS.reposicion(el); const rq=document.getElementById('repq'); if(rq){ rq.focus(); rq.setSelectionRange(rq.value.length,rq.value.length); } }
 function printReposicion(list, totalUnid, valor){
@@ -3235,14 +3236,24 @@ function gastoModal(){
 }
 
 /* ---------- ORDEN DE COMPRA ---------- */
-let oc=null;
+let oc=null, ocPreload=null;
 VIEWS.ordencompra=(el)=>{
+  const preload = ocPreload; ocPreload=null;
+  const abrirNueva = preload && puede('ordencompra','registrar');
   el.innerHTML=`<div class="page-head"><div><h1>Orden de Compra</h1><p>Pedidos a proveedores — al recibirlos ingresan el stock</p></div>
-    <div class="segmented" id="segOC"><button data-t="lista" class="active">Historial</button>${pgate('ordencompra','registrar',`<button data-t="nueva">Nueva orden</button>`)}</div></div>
+    <div class="segmented" id="segOC"><button data-t="lista" class="${abrirNueva?'':'active'}">Historial</button>${pgate('ordencompra','registrar',`<button data-t="nueva" class="${abrirNueva?'active':''}">Nueva orden</button>`)}</div></div>
     <div id="ocBody"></div>`;
   el.querySelectorAll('#segOC button').forEach(b=>b.onclick=()=>{el.querySelectorAll('#segOC button').forEach(x=>x.classList.remove('active'));b.classList.add('active');b.dataset.t==='nueva'?renderNuevaOC():renderOCLista();});
-  renderOCLista();
+  if(abrirNueva){ oc={proveedor:DB.proveedores[0]?.nombre||'', lines:preload}; drawOC(); toast(preload.length+' producto(s) sugerido(s) precargado(s) — elige el proveedor y graba','success'); }
+  else renderOCLista();
 };
+// Genera una Orden de Compra precargada con una lista de reposición (items {id,sugerido,costo}).
+function generarOCDesde(items){
+  if(!puede('ordencompra','registrar')){ toast('No tienes permiso para crear órdenes de compra','error'); return; }
+  const lines=(items||[]).filter(x=>x.sugerido>0).map(x=>({prodId:x.id, cant:x.sugerido, costo:Number(x.costo)||0}));
+  if(!lines.length){ toast('No hay productos que reponer','error'); return; }
+  ocPreload=lines; go('ordencompra');
+}
 function renderOCLista(){
   const b=document.getElementById('ocBody');
   const pend=DB.ordenescompra.filter(o=>o.estado!=='Recibida').reduce((s,o)=>s+Number(o.total||0),0);
