@@ -565,6 +565,17 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## CARGA DE DATOS REALES (2026-08-12)
+- ✅ **Import CSV de Clientes y Proveedores** (`importarEntidad` + `mapClienteRow`/`mapProveedorRow` puros/testeados): columnas flexibles (razonsocial/nombre, ruc/dni/doc, lineacredito/credito, telefono/tel, correo/email…), detecta DNI(8)→Natural / RUC(11)→Jurídica, filtra filas sin nombre, reemplazar o añadir. Botones "Importar CSV" en Clientes y Proveedores (con permiso).
+- ✅ **Plantillas descargables** (`PLANTILLAS` + `descargarPlantilla`): botón "Plantilla" en Productos, Clientes y Proveedores → CSV con encabezado + 1 fila de ejemplo.
+- ✅ Import de **Productos** ahora también lee la columna `proveedor` (proveedor habitual).
+- **Verificación:** `tests/importdatos.test.js` — 9/9 (mapeo flexible, RUC/DNI, filtra sin nombre). **Suite total: 253/253.**
+- **Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+**Para el usuario:** descargar la plantilla de cada módulo, llenarla con los datos exportados del SGAE (Excel → Guardar como CSV), e Importar. Respaldar con Configuración → Exportar respaldo.
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.

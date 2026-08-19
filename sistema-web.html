@@ -899,6 +899,7 @@ VIEWS.productos = (el) => {
     <div class="page-head">
       <div><h1>Productos</h1><p>${DB.productos.length} productos en el catálogo</p></div>
       <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" id="prodPlantilla">${ICN.download} Plantilla</button>
         <button class="btn btn-ghost" id="impBtn">${ICN.upload} Importar</button>
         <button class="btn btn-ghost" id="expBtn">${ICN.download} Exportar</button>
         ${pgate('productos','registrar',`<button class="btn btn-primary" id="addBtn">${ICN.plus} Nuevo producto</button>`)}
@@ -923,6 +924,7 @@ VIEWS.productos = (el) => {
 
   const addProdBtn=document.getElementById('addBtn'); if(addProdBtn) addProdBtn.onclick = ()=>productModal();
   document.getElementById('expBtn').onclick = exportProductos;
+  { const pl=document.getElementById('prodPlantilla'); if(pl) pl.onclick=()=>descargarPlantilla('productos'); }
   document.getElementById('impBtn').onclick = ()=>document.getElementById('fileInput').click();
   document.getElementById('fileInput').onchange = importProductos;
   const pq = document.getElementById('pq');
@@ -1101,7 +1103,7 @@ function importProductos(e){
         if(!cols.length||!cols.join('')) return;
         const o={}; head.forEach((h,i)=>o[h]=cols[i]);
         const pri=parseInt(o.pri)||0, cie=parseInt(o.cie)||0, vit=parseInt(o.vit)||0, mer=parseInt(o.mer)||0;
-        nuevos.push({ id:uid(), codigo:o.codigo||o.codproducto||('IMP-'+nuevos.length), codFab:o.codfab||o.codigoreeim||o.codigoalternativo||'', desc:o.desc||o.descripcion||o.producto||'', marca:o.marca||'', linea:o.linea||'', origen:o.origen||'', um:o.um||'UND', costo:parseFloat(o.costo)||0, moneda:o.moneda||'S/', precio:parseFloat(o.precio)||0, precioSug:parseFloat(o.preciosug)||0, precioMayor:parseFloat(o.preciomayor)||0, precioTaller:parseFloat(o.preciotaller)||0, precioFlota:parseFloat(o.precioflota)||0, ubicacion:o.ubicacion||'', stock:parseInt(o.stock)||parseInt(o.total)||(pri+cie+vit)||0, stockMin:parseInt(o.stockmin)||0, pri, cie, vit, mer });
+        nuevos.push({ id:uid(), codigo:o.codigo||o.codproducto||('IMP-'+nuevos.length), codFab:o.codfab||o.codigoreeim||o.codigoalternativo||'', desc:o.desc||o.descripcion||o.producto||'', marca:o.marca||'', linea:o.linea||'', origen:o.origen||'', proveedor:o.proveedor||'', um:o.um||'UND', costo:parseFloat(o.costo)||0, moneda:o.moneda||'S/', precio:parseFloat(o.precio)||0, precioSug:parseFloat(o.preciosug)||0, precioMayor:parseFloat(o.preciomayor)||0, precioTaller:parseFloat(o.preciotaller)||0, precioFlota:parseFloat(o.precioflota)||0, ubicacion:o.ubicacion||'', stock:parseInt(o.stock)||parseInt(o.total)||(pri+cie+vit)||0, stockMin:parseInt(o.stockmin)||0, pri, cie, vit, mer });
       });
       const reemplazar = DB.productos.length>0 ? confirm(`Se leyeron ${nuevos.length} productos del archivo.\n\nAceptar = REEMPLAZAR el catálogo actual\nCancelar = AÑADIR a los productos existentes`) : true;
       DB.productos = reemplazar ? nuevos : nuevos.concat(DB.productos);
@@ -1116,6 +1118,50 @@ function importProductos(e){
   };
   r.readAsText(file);
 }
+// Mapeo de una fila CSV (claves en minúscula) a cliente / proveedor. PUROS/testeables.
+function mapClienteRow(o){
+  o=o||{};
+  const doc=String(o.doc||o.ruc||o.dni||o.documento||'').trim();
+  const tipoDoc=String(o.tipodoc||(doc.length===8?'DNI':'RUC')).toUpperCase();
+  return {
+    tipoCliente:o.tipocliente||(tipoDoc==='DNI'?'Natural':'Jurídica'), tipoDoc, doc,
+    nombre:o.nombre||o.razonsocial||o.cliente||'', nomComercial:o.nomcomercial||o.nombrecomercial||'',
+    dir:o.dir||o.direccion||'', distrito:o.distrito||'', zona:o.zona||'', vendedor:o.vendedor||'', categoria:o.categoria||'Sin categoría',
+    credito:parseFloat(o.credito||o.lineacredito||o.linea||'')||0, monedaCredito:(o.monedacredito||o.moneda||'S/'),
+    tel:o.tel||o.telefono||o.celular||'', contacto:o.contacto||'', correo1:(o.correo||o.correo1||o.email||''), email:(o.correo||o.correo1||o.email||''),
+    nivelPrecio:(o.nivel||o.nivelprecio||'mostrador'), estado:(o.estado||'Activo')
+  };
+}
+function mapProveedorRow(o){
+  o=o||{};
+  return { doc:String(o.doc||o.ruc||o.documento||'').trim(), nombre:o.nombre||o.razonsocial||o.proveedor||'',
+    contacto:o.contacto||'', tel:o.tel||o.telefono||o.celular||'', email:o.correo||o.email||'', dir:o.dir||o.direccion||'' };
+}
+function importarEntidad(e, tipo){
+  const file=e.target.files[0]; if(!file){return;} const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const rows=parseCSV(r.result); if(rows.length<2){toast('Archivo vacío','error');return;}
+      const head=rows[0].map(h=>h.trim().toLowerCase()); const nuevos=[];
+      rows.slice(1).forEach(cols=>{ if(!cols.length||!cols.join('').trim()) return; const o={}; head.forEach((h,i)=>o[h]=(cols[i]||'').trim());
+        const data=tipo==='clientes'?mapClienteRow(o):mapProveedorRow(o); if(!String(data.nombre).trim()) return; nuevos.push({id:uid(), ...data}); });
+      if(!nuevos.length){ toast('Sin filas válidas. Debe existir la columna "nombre".','error'); return; }
+      const arr=tipo==='clientes'?'clientes':'proveedores';
+      const reemplazar = DB[arr].length>0 ? confirm(`Se leyeron ${nuevos.length} ${arr}.\n\nAceptar = REEMPLAZAR los ${arr} actuales\nCancelar = AÑADIR a los existentes`) : true;
+      DB[arr]=reemplazar?nuevos:nuevos.concat(DB[arr]);
+      save().then(()=>toast(`${nuevos.length} ${arr} cargados`,'success')).catch(()=>toast('Cargados en sesión; no se pudieron guardar','error'));
+      renderNav(); tipo==='clientes'?renderCliTable():renderProvTable();
+    }catch(err){ toast('Error al leer el archivo','error'); }
+    e.target.value='';
+  };
+  r.readAsText(file);
+}
+const PLANTILLAS={
+  productos:'codigo,codfab,desc,marca,linea,origen,proveedor,um,costo,moneda,precio,preciomayor,preciotaller,precioflota,stock,stockmin,ubicacion\nFIL-001,W712/75,Filtro de aceite MANN,MANN,Filtros,Alemania,Importaciones Andinas S.A.,UND,12.50,S/,22.00,20.00,21.00,19.00,48,10,Z1-E3-N2',
+  clientes:'tipodoc,doc,nombre,nomcomercial,direccion,distrito,zona,vendedor,categoria,credito,moneda,telefono,contacto,correo\nRUC,20512345678,Transportes El Rapido S.A.C.,El Rapido,Av. Industrial 234,La Victoria,Lima,SILVIA LEON,Mayorista,5000,S/,987654321,Luis Medina,ventas@elrapido.pe',
+  proveedores:'ruc,nombre,contacto,telefono,correo,direccion\n20601122334,Importaciones Andinas S.A.,Maria Torres,014567890,compras@impandinas.pe,Callao'
+};
+function descargarPlantilla(tipo){ downloadCSV('plantilla_'+tipo+'.csv', PLANTILLAS[tipo]); toast('Plantilla descargada','success'); }
 
 /* ---------- CLIENTES ---------- */
 let cliQ='';
@@ -1123,7 +1169,8 @@ VIEWS.clientes = (el) => {
   el.innerHTML = `
     <div class="page-head">
       <div><h1>Clientes</h1><p>${DB.clientes.length} clientes registrados</p></div>
-      ${pgate('clientes','registrar',`<button class="btn btn-primary" id="addCli">${ICN.plus} Nuevo cliente</button>`)}
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-ghost" id="cliPlantilla">${ICN.download} Plantilla</button>${pgate('clientes','registrar',`<button class="btn btn-ghost" id="cliImp">${ICN.upload} Importar CSV</button><button class="btn btn-primary" id="addCli">${ICN.plus} Nuevo cliente</button>`)}</div>
+      <input type="file" id="cliFile" accept=".csv" class="hidden">
     </div>
     <div class="card">
       <div style="padding:16px;border-bottom:1px solid var(--line)">
@@ -1133,6 +1180,9 @@ VIEWS.clientes = (el) => {
       <div class="table-wrap" id="cliTable"></div>
     </div>`;
   const addCliBtn=document.getElementById('addCli'); if(addCliBtn) addCliBtn.onclick=()=>clienteModal();
+  document.getElementById('cliPlantilla').onclick=()=>descargarPlantilla('clientes');
+  const cliImp=document.getElementById('cliImp'); if(cliImp) cliImp.onclick=()=>document.getElementById('cliFile').click();
+  const cliFile=document.getElementById('cliFile'); if(cliFile) cliFile.onchange=(ev)=>importarEntidad(ev,'clientes');
   const cq=document.getElementById('cq'); cq.oninput=()=>{cliQ=cq.value;renderCliTable();};
   renderCliTable();
 };
@@ -1226,12 +1276,16 @@ let provQ='';
 VIEWS.proveedores=(el)=>{
   el.innerHTML=`
     <div class="page-head"><div><h1>Proveedores</h1><p>${DB.proveedores.length} proveedores</p></div>
-      ${pgate('proveedores','registrar',`<button class="btn btn-primary" id="addProv">${ICN.plus} Nuevo proveedor</button>`)}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-ghost" id="provPlantilla">${ICN.download} Plantilla</button>${pgate('proveedores','registrar',`<button class="btn btn-ghost" id="provImp">${ICN.upload} Importar CSV</button><button class="btn btn-primary" id="addProv">${ICN.plus} Nuevo proveedor</button>`)}</div>
+      <input type="file" id="provFile" accept=".csv" class="hidden"></div>
     <div class="card"><div style="padding:16px;border-bottom:1px solid var(--line)">
       <div class="search" style="width:340px;max-width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input id="vq" placeholder="Buscar proveedor..." value="${provQ}"/></div></div>
       <div class="table-wrap" id="provTable"></div></div>`;
   const addProvBtn=document.getElementById('addProv'); if(addProvBtn) addProvBtn.onclick=()=>provModal();
+  document.getElementById('provPlantilla').onclick=()=>descargarPlantilla('proveedores');
+  const provImp=document.getElementById('provImp'); if(provImp) provImp.onclick=()=>document.getElementById('provFile').click();
+  const provFile=document.getElementById('provFile'); if(provFile) provFile.onchange=(ev)=>importarEntidad(ev,'proveedores');
   const vq=document.getElementById('vq');vq.oninput=()=>{provQ=vq.value;renderProvTable();};
   renderProvTable();
 };
