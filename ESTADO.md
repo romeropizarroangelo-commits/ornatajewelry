@@ -538,6 +538,15 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## IMPORTACIÓN — precios por nivel sugeridos (2026-08-12)
+- ✅ `precioSugerido(costo, margen%)` y `preciosNivelSugeridos(costo, {mostrador,mayor,taller,flota})` (puros/testeados; margen vacío → nivel null).
+- ✅ Cabecera de importación: Margen % Mostrador (→ precio sugerido) + márgenes opcionales **Por Mayor / Taller / Flota** + checkbox **"Actualizar precios por nivel al recibir"** (default OFF, es reemplazo de precios reales).
+- ✅ Al **recibir**: además del costo ponderado y el precioSug, si está activado reemplaza `precio`/`precioMayor`/`precioTaller`/`precioFlota` con el sugerido de cada nivel (convertido a la moneda del producto), solo para los niveles con margen definido.
+- **Verificación:** `tests/importacion.test.js` — 27/27. **Suite total: 227/227.**
+- **Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.

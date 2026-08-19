@@ -60,6 +60,13 @@ const near=(a,b)=>Math.abs(a-b)<1e-6;
   ok(near(precioSugerido(33.33,50),50), 'redondea a 2 decimales (33.33×1.5 = 49.995 → 50.00)');
   ok(near(precioSugerido(80,0),80), 'margen 0 → precio = costo');
 
+  console.log('\n[2c] Precios sugeridos POR NIVEL');
+  eval(extractFn('preciosNivelSugeridos'));
+  let pn=preciosNivelSugeridos(100, {mostrador:40, mayor:20, taller:'', flota:15});
+  ok(near(pn.mostrador,140) && near(pn.mayor,120) && near(pn.flota,115), 'mostrador 140, mayor 120, flota 115');
+  ok(pn.taller===null, 'nivel con margen vacío → null (no se sugiere ese nivel)');
+  ok(preciosNivelSugeridos(100,{}).mostrador===null, 'sin márgenes → todos null');
+
   console.log('\n[3] Carga masiva: parseImportCSV');
   eval(extractFn('parseImportCSV'));
   let rows=parseImportCSV('codigo,cantidad,fob\nW712/75,10,3.50\nBKR6E,24,1.20\n');
