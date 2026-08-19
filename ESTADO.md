@@ -555,6 +555,16 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## DASHBOARD POTENTE para el rubro (2026-08-12)
+- ✅ Reescrito honesto y accionable (antes tenía un "+12.5%" **inventado** y "ventas" eran el acumulado histórico). `resumenMesVentas(rango)` (testeado): total/base/costo/utilidad/n del mes, excluye anuladas, aísla por mes.
+- ✅ **KPIs reales del mes**: Ventas del mes con **% real vs mes anterior**; Utilidad del mes + margen % (admin) / nº ventas (vendedor); Por cobrar con **monto vencido**; Valor de inventario.
+- ✅ **Tarjetas "Requiere tu atención" clicables** (`dashAlert`, van a su módulo): Productos a reponer (usa `sugerenciaReposicion`), Clientes morosos + vencido, **Importaciones en tránsito**, Cotizaciones pendientes.
+- ✅ Gráficos: Ventas 6 meses (real) + **Top marcas por ventas del mes** (`ventasPorCategoria`). Tablas: últimas ventas + **compras sugeridas** (reemplaza el simple "bajo mínimo"). Botón rápido de Cotización.
+- **Verificación:** `tests/dashboard.test.js` — 8/8 (total/base/costo/utilidad del mes; excluye anuladas; aísla por mes; mes vacío). **Suite total: 244/244.**
+- **Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.

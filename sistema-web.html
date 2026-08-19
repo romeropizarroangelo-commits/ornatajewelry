@@ -780,23 +780,45 @@ function go(view){
 /* ---------- Vistas ---------- */
 const VIEWS = {};
 
+function mesRango(off){ const d=new Date(); const dd=new Date(d.getFullYear(), d.getMonth()-off, 1); const y=dd.getFullYear(), m=String(dd.getMonth()+1).padStart(2,'0'); return { desde:`${y}-${m}-01`, hasta:`${y}-${m}-31`, label:dd.toLocaleDateString('es-PE',{month:'long'}) }; }
+function resumenMesVentas(rg){ let total=0, base=0, costo=0, n=0;
+  DB.ventas.forEach(v=>{ if(v.estado==='Anulada') return; const f=v.fecha||''; if(f<rg.desde||f>rg.hasta) return; n++; total+=Number(v.total||0); base+=Number(v.subtotal||v.total||0); (v.lineas||[]).forEach(l=>{ costo+=Number(l.costoSoles||0)*Number(l.cant||0); }); });
+  return { total:R2(total), base:R2(base), costo:R2(costo), utilidad:R2(base-costo), n }; }
 VIEWS.dashboard = (el) => {
+  const hoy=new Date().toISOString().slice(0,10);
+  const m0=mesRango(0), m1=mesRango(1);
+  const rMes=resumenMesVentas(m0), rPrev=resumenMesVentas(m1);
+  const pct = rPrev.total>0 ? Math.round((rMes.total-rPrev.total)/rPrev.total*100) : (rMes.total>0?100:0);
   const totalStock = DB.productos.reduce((s,p)=>s+Number(p.stock||0),0);
-  const ventasHoy = DB.ventas.reduce((s,v)=>s+Number(v.total||0),0);
-  const porCobrar = totalPorCobrar();
-  const bajoStock = DB.productos.filter(p=>Number(p.stock)<=Number(p.stockMin));
   const valorInv = DB.productos.reduce((s,p)=>s+Number(p.costo||0)*Number(p.stock||0),0);
+  const porCobrar = totalPorCobrar();
+  // Vencido + morosos (un solo recorrido, sin O(n²))
+  let vencido=0; const morososSet=new Set();
+  DB.ventas.forEach(v=>{ if(esPendienteDoc(v)){ const ref=v.vcto||v.fecha; if(ref && ref<hoy){ vencido+=docSaldo(v); morososSet.add(v.cliente||v.clienteId); } } });
+  vencido=R2(vencido);
+  const repos=sugerenciaReposicion(DB.productos,2);
+  const agotados=repos.filter(x=>x.disponible<=0).length;
+  const impTransito=DB.importaciones.filter(o=>o.estado!=='Recibida');
+  const cotizPend=DB.cotizaciones.filter(c=>c.estado!=='Facturada');
+  const topMarcas=ventasPorCategoria(DB.ventas, DB.productos, 'marca', m0.desde, m0.hasta).slice(0,6).map(x=>[x.cat, Math.round(x.importe)]);
 
   el.innerHTML = `
     <div class="page-head">
-      <div><h1>Hola, ${SESSION?SESSION.nombre:''} 👋</h1><p>Resumen de tu negocio · ${new Date().toLocaleDateString('es-PE',{weekday:'long', day:'numeric', month:'long', year:'numeric'})}</p></div>
-      <button class="btn btn-primary" id="qVenta">${ICN.plus} Nueva venta</button>
+      <div><h1>Hola, ${SESSION?SESSION.nombre:''} 👋</h1><p>Resumen de <b>${m0.label}</b> · ${new Date().toLocaleDateString('es-PE',{weekday:'long', day:'numeric', month:'long', year:'numeric'})}</p></div>
+      <div style="display:flex;gap:10px"><button class="btn btn-ghost" id="qCotiz">${ICN.plus} Cotización</button><button class="btn btn-primary" id="qVenta">${ICN.plus} Nueva venta</button></div>
     </div>
     <div class="kpi-grid">
-      ${kpiCard('money','var(--green)','var(--green-soft)','Ventas registradas', money(ventasHoy), '+12.5%', true)}
-      ${kpiCard('cart','var(--brand)','var(--brand-soft)','Nº de ventas', DB.ventas.length, DB.ventas.length+' documentos', null)}
-      ${esAdmin()?kpiCard('box','var(--purple)','var(--purple-soft)','Valor de inventario', money(valorInv), totalStock+' unidades', null):kpiCard('box','var(--purple)','var(--purple-soft)','Unidades en stock', totalStock.toLocaleString('es-PE'), DB.productos.length+' productos', null)}
-      ${kpiCard('alert', bajoStock.length?'var(--red)':'var(--amber)', bajoStock.length?'var(--red-soft)':'var(--amber-soft)','Por cobrar', money(porCobrar), bajoStock.length+' productos bajo stock', bajoStock.length? false : null)}
+      ${kpiCard('money','var(--green)','var(--green-soft)','Ventas del mes', money(rMes.total), (pct>=0?'+':'')+pct+'% vs '+m1.label, pct>=0?true:false)}
+      ${esAdmin()?kpiCard('reportes','var(--brand)','var(--brand-soft)','Utilidad del mes', money(rMes.utilidad), rMes.base>0?Math.round(rMes.utilidad/rMes.base*100)+'% margen · '+rMes.n+' ventas':rMes.n+' ventas', null):kpiCard('cart','var(--brand)','var(--brand-soft)','Ventas del mes (nº)', rMes.n, 'documentos', null)}
+      ${kpiCard('cobrar', vencido>0?'var(--red)':'var(--amber)', vencido>0?'var(--red-soft)':'var(--amber-soft)','Por cobrar', money(porCobrar), vencido>0?(money(vencido)+' vencido'):'al día', vencido>0?false:null)}
+      ${esAdmin()?kpiCard('box','var(--purple)','var(--purple-soft)','Valor de inventario', money(valorInv), totalStock.toLocaleString('es-PE')+' unidades', null):kpiCard('box','var(--purple)','var(--purple-soft)','Unidades en stock', totalStock.toLocaleString('es-PE'), DB.productos.length+' productos', null)}
+    </div>
+    <div class="section-title" style="border:none;padding-left:2px;margin-top:4px">Requiere tu atención</div>
+    <div class="kpi-grid" style="margin-bottom:22px">
+      ${dashAlert('alert', repos.length?'var(--red)':'var(--green)', repos.length?'var(--red-soft)':'var(--green-soft)','Productos a reponer', repos.length, agotados+' agotados', 'reposicion')}
+      ${dashAlert('cobrar', vencido>0?'var(--red)':'var(--green)', vencido>0?'var(--red-soft)':'var(--green-soft)','Clientes morosos', morososSet.size, money(vencido)+' vencido', 'morosos')}
+      ${dashAlert('compras', impTransito.length?'var(--amber)':'var(--green)', impTransito.length?'var(--amber-soft)':'var(--green-soft)','Importaciones en tránsito', impTransito.length, 'por recibir', 'importacion')}
+      ${dashAlert('cobrar', cotizPend.length?'var(--brand)':'var(--green)', cotizPend.length?'var(--brand-soft)':'var(--green-soft)','Cotizaciones pendientes', cotizPend.length, 'sin facturar', 'cotizaciones')}
     </div>
     <div class="grid-2" style="margin-bottom:20px">
       <div class="card">
@@ -804,49 +826,40 @@ VIEWS.dashboard = (el) => {
         <div style="padding:18px 20px;color:var(--ink)">${barChartSVG(ventasPorMes())}</div>
       </div>
       <div class="card">
-        <div class="section-title">Top líneas por nº de productos</div>
-        <div style="padding:20px">${hbarsSVG(Object.entries(DB.productos.reduce((a,p)=>{const k=p.linea||'Otros';a[k]=(a[k]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6)) || '<div class="empty">Sin datos</div>'}</div>
+        <div class="section-title">Top marcas por ventas (${m0.label})</div>
+        <div style="padding:20px">${topMarcas.length?hbarsSVG(topMarcas):'<div class="empty" style="padding:24px">Sin ventas este mes</div>'}</div>
       </div>
     </div>
     <div class="grid-2">
       <div class="card">
         <div class="section-title">Últimas ventas <a class="btn btn-ghost btn-sm" id="verVentas">Ver todo</a></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Documento</th><th>Cliente</th><th>Fecha</th><th>Estado</th><th style="text-align:right">Total</th></tr></thead>
-            <tbody>
-              ${DB.ventas.slice(0,6).map(v=>`
-                <tr>
-                  <td class="cell-mono">${v.num}</td>
-                  <td class="cell-strong">${v.cliente}</td>
-                  <td>${fmtDate(v.fecha)}</td>
-                  <td>${estadoBadge(v.estado)}</td>
-                  <td style="text-align:right" class="cell-strong">${money(v.total)}</td>
-                </tr>`).join('') || emptyRow(5)}
-            </tbody>
-          </table>
-        </div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Documento</th><th>Cliente</th><th>Fecha</th><th>Estado</th><th style="text-align:right">Total</th></tr></thead>
+          <tbody>${DB.ventas.slice(0,6).map(v=>`<tr><td class="cell-mono">${v.num}</td><td class="cell-strong">${v.cliente}</td><td>${fmtDate(v.fecha)}</td><td>${estadoBadge(v.estado)}</td><td style="text-align:right" class="cell-strong">${money(v.total)}</td></tr>`).join('') || emptyRow(5)}</tbody>
+        </table></div>
       </div>
       <div class="card">
-        <div class="section-title" style="color:${bajoStock.length?'var(--red)':''}">${bajoStock.length?'⚠️ ':''}Stock bajo mínimo</div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Producto</th><th style="text-align:center">Stock</th><th style="text-align:center">Mín</th></tr></thead>
-            <tbody>
-              ${bajoStock.map(p=>`
-                <tr>
-                  <td><div class="cell-strong">${p.desc}</div><div class="cell-mono">${p.codigo}</div></td>
-                  <td style="text-align:center">${stockBadge(p)}</td>
-                  <td style="text-align:center" class="cell-mono">${p.stockMin}</td>
-                </tr>`).join('') || `<tr><td colspan="3" class="empty" style="padding:32px">✅ Todo el stock está en orden</td></tr>`}
-            </tbody>
-          </table>
-        </div>
+        <div class="section-title" style="color:${repos.length?'var(--red)':''}">${repos.length?'⚠️ ':''}Compras sugeridas <a class="btn btn-ghost btn-sm" id="verRepos">Ver todo</a></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Producto</th><th style="text-align:center">Disp.</th><th style="text-align:center">Mín</th><th style="text-align:center">Sugerido</th></tr></thead>
+          <tbody>${repos.slice(0,7).map(x=>`<tr><td><div class="cell-strong">${x.desc}</div><div class="cell-mono">${x.codigo}</div></td><td style="text-align:center"><span style="color:${x.disponible<=0?'var(--red)':'var(--amber)'};font-weight:700">${x.disponible}</span></td><td style="text-align:center" class="cell-mono">${x.min}</td><td style="text-align:center;color:var(--brand)" class="cell-strong">${x.sugerido}</td></tr>`).join('') || `<tr><td colspan="4" class="empty" style="padding:32px">✅ Todo el stock está en orden</td></tr>`}</tbody>
+        </table></div>
       </div>
     </div>`;
   document.getElementById('qVenta').onclick = ()=>go('ventas');
+  document.getElementById('qCotiz').onclick = ()=>go('cotizaciones');
   document.getElementById('verVentas').onclick = ()=>go('ventas');
+  const vr=document.getElementById('verRepos'); if(vr) vr.onclick=()=>go('reposicion');
+  el.querySelectorAll('[data-dash]').forEach(c=>c.onclick=()=>go(c.dataset.dash));
 };
+function dashAlert(icon,color,soft,label,value,sub,view){
+  return `<div class="card kpi" data-dash="${view}" style="cursor:pointer">
+    <div class="kpi-icon" style="background:${soft};color:${color}">${ICN[icon]}</div>
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    <div class="kpi-trend" style="color:${color}">${sub} →</div>
+  </div>`;
+}
 
 function kpiCard(icon, color, soft, label, value, trend, up) {
   const trendCls = up===true?'up':up===false?'down':'';
