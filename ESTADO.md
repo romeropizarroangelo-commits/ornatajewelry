@@ -547,6 +547,14 @@ El usuario mandó 8 capturas más de su SGAE mostrando detalle no replicado aún
 
 ---
 
+## REPOSICIÓN / Compras Sugeridas (2026-08-12)
+- ✅ `sugerenciaReposicion(productos, factor)` (puro/testeado): productos con mínimo definido y **disponible ≤ mínimo**; sugerido = (mínimo × factor) − disponible; usa **disponible** (stock − reservado); ordena por inversión estimada.
+- ✅ Vista `VIEWS.reposicion` (Inventario → Reposición): filtro de búsqueda + selector "reponer hasta ×mínimo" (1/1.5/2/3), KPIs (a reponer / agotados / unidades / inversión), tabla con Sugerido + inversión, Exportar CSV e Imprimir (lista para el comprador).
+- **Verificación:** `tests/reposicion.test.js` — 9/9 (usa disponible no stock, factor, orden por inversión, vacío). **Suite total: 236/236.**
+- **Publicado:** push `main` → `https://ornatajewelryperu.com/sistema.html`.
+
+---
+
 ## PENDIENTE / decisión del usuario
 - **Dominio propio:** el usuario TIENE un dominio (nombre por confirmar). Opción rápida sin costo: publicar el sistema en su dominio vía GitHub Pages (sigue siendo datos por-PC). Se interrumpió la pregunta; retomar cuando lo indique.
 - **FASE 5 (Backend + SUNAT):** la única que exige servidor (multiusuario real + facturación electrónica). Costo mensual + proveedor OSE/PSE. Proyecto grande. **Es el único gran bloque que falta** ahora que los módulos están completos.

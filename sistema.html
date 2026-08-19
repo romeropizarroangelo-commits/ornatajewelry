@@ -690,6 +690,7 @@ const MENU = [
   ]},
   { key:'inventario', label:'Inventario', icon:'inventario', children:[
     { id:'inventario', label:'Stock Actual' },
+    { id:'reposicion', label:'Reposición / Compras Sugeridas' },
     { id:'kardex', label:'Kardex' },
     { id:'ajuste', label:'Ajuste de Inventario' },
     { id:'guiaremision', label:'Guía de Remisión' },
@@ -3099,6 +3100,58 @@ VIEWS.repcategorias=(el)=>{
   set('rcClear','onclick',()=>{rcatDesde='';rcatHasta='';go('repcategorias');});
   set('rcExp','onclick',()=>{ const rows=[[dimLabel.toLowerCase(),'unidades','importe','porcentaje'].join(',')].concat(list.map(x=>[csvCell(x.cat),x.cant,x.importe,(totalImp?Math.round(x.importe/totalImp*100):0)].join(','))); downloadCSV('ventas_por_'+rcatDim+'.csv',rows.join('\n')); toast('Exportado','success'); });
 };
+/* Reposición / compras sugeridas: productos en o bajo el mínimo, con cantidad sugerida. PURO/testeable.
+   Sugerido = reponer hasta (mínimo × factor). Solo productos con mínimo definido y disponible ≤ mínimo. */
+function sugerenciaReposicion(productos, factor){
+  factor=Number(factor)||2; const out=[];
+  (productos||[]).forEach(p=>{
+    const min=Number(p.stockMin)||0; if(min<=0) return;
+    const disp=(Number(p.stock)||0)-(Number(p.reservado)||0);
+    if(disp>min) return;
+    const objetivo=Math.round(min*factor), sugerido=Math.max(0, objetivo-disp), costo=Number(p.costo)||0;
+    out.push({ id:p.id, codigo:p.codigo, desc:p.desc, marca:p.marca||'', linea:p.linea||'', stock:Number(p.stock)||0, disponible:disp, min, sugerido, costo, moneda:p.moneda||'S/', valorEstimado:Math.round(sugerido*costo*100)/100 });
+  });
+  return out.sort((a,b)=>b.valorEstimado-a.valorEstimado);
+}
+let repoFactor=2, repoQ='';
+VIEWS.reposicion=(el)=>{
+  let list=sugerenciaReposicion(DB.productos, repoFactor);
+  const q=repoQ.toLowerCase().trim();
+  if(q) list=list.filter(x=>[x.codigo,x.desc,x.marca,x.linea].some(v=>String(v||'').toLowerCase().includes(q)));
+  const totalItems=list.length, totalUnid=list.reduce((s,x)=>s+x.sugerido,0), valor=R2(list.reduce((s,x)=>s+x.valorEstimado,0));
+  const agotados=list.filter(x=>x.disponible<=0).length;
+  el.innerHTML=`<div class="page-head"><div><h1>Reposición / Compras Sugeridas</h1><p>Productos en o por debajo del stock mínimo</p></div>
+    ${list.length?`<div style="display:flex;gap:10px"><button class="btn btn-ghost" id="repExp">${ICN.download} Exportar</button><button class="btn btn-primary" id="repPrint">${ICN.print} Imprimir</button></div>`:''}</div>
+    <div class="card" style="margin-bottom:18px"><div style="padding:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+      <div class="search" style="width:300px;max-width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input id="repq" placeholder="Filtrar por código, marca, línea..." value="${(repoQ||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field" style="margin:0;min-width:170px"><label>Reponer hasta (× mínimo)</label><select id="repFactor"><option value="1" ${repoFactor==1?'selected':''}>1× (llegar al mínimo)</option><option value="1.5" ${repoFactor==1.5?'selected':''}>1.5×</option><option value="2" ${repoFactor==2?'selected':''}>2×</option><option value="3" ${repoFactor==3?'selected':''}>3×</option></select></div>
+    </div></div>
+    <div class="kpi-grid" style="margin-bottom:18px">
+      ${kpiCard('alert', totalItems?'var(--red)':'var(--green)', totalItems?'var(--red-soft)':'var(--green-soft)','Productos a reponer',totalItems, agotados+' agotados', totalItems?false:null)}
+      ${kpiCard('box','var(--purple)','var(--purple-soft)','Unidades sugeridas',totalUnid.toLocaleString('es-PE'),'a comprar',null)}
+      ${kpiCard('money','var(--brand)','var(--brand-soft)','Inversión estimada',money(valor),'a costo',null)}
+    </div>
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th style="text-align:center">Stock</th><th style="text-align:center">Disp.</th><th style="text-align:center">Mín.</th><th style="text-align:center">Sugerido</th><th style="text-align:right">Costo</th><th style="text-align:right">Inversión</th></tr></thead><tbody>
+      ${list.map(x=>`<tr><td class="cell-mono cell-strong">${x.codigo}</td><td class="cell-strong">${x.desc}</td><td>${x.marca||'—'}</td>
+        <td style="text-align:center">${x.stock}</td><td style="text-align:center"><span style="color:${x.disponible<=0?'var(--red)':'var(--amber)'};font-weight:700">${x.disponible}</span></td><td style="text-align:center">${x.min}</td>
+        <td style="text-align:center;color:var(--brand)" class="cell-strong">${x.sugerido}</td><td style="text-align:right" class="cell-mono">${money2(x.costo,x.moneda)}</td><td style="text-align:right" class="cell-strong">${money(x.valorEstimado)}</td></tr>`).join('')||`<tr><td colspan="9" class="empty" style="padding:40px">✅ Ningún producto está por debajo del mínimo.</td></tr>`}
+      </tbody>${list.length?`<tfoot><tr><td colspan="6" class="cell-strong">TOTAL (${totalItems} productos)</td><td style="text-align:center" class="cell-strong">${totalUnid}</td><td></td><td style="text-align:right" class="cell-strong">${money(valor)}</td></tr></tfoot>`:''}</table></div></div>`;
+  const rq=document.getElementById('repq'); if(rq) rq.oninput=()=>{repoQ=rq.value; const cur=rq.selectionStart; renderReposFast(); };
+  const rf=document.getElementById('repFactor'); if(rf) rf.onchange=e=>{repoFactor=Number(e.target.value)||2; go('reposicion');};
+  const ex=document.getElementById('repExp'); if(ex) ex.onclick=()=>{ const rows=[['codigo','producto','marca','stock','disponible','minimo','sugerido','costo','inversion'].join(',')].concat(list.map(x=>[csvCell(x.codigo),csvCell(x.desc),csvCell(x.marca),x.stock,x.disponible,x.min,x.sugerido,x.costo,x.valorEstimado].join(','))); downloadCSV('reposicion.csv',rows.join('\n')); toast('Exportado','success'); };
+  const pb=document.getElementById('repPrint'); if(pb) pb.onclick=()=>printReposicion(list, totalUnid, valor);
+};
+function renderReposFast(){ const el=document.getElementById('view'); if(el) VIEWS.reposicion(el); const rq=document.getElementById('repq'); if(rq){ rq.focus(); rq.setSelectionRange(rq.value.length,rq.value.length); } }
+function printReposicion(list, totalUnid, valor){
+  const w=window.open('','_blank','width=980,height=1000'); if(!w){toast('Permite las ventanas emergentes','error');return;}
+  const rows=list.map(x=>`<tr><td>${x.codigo}</td><td>${x.desc}</td><td>${x.marca||''}</td><td class="c">${x.stock}</td><td class="c">${x.disponible}</td><td class="c">${x.min}</td><td class="c"><b>${x.sugerido}</b></td><td class="r">${money2(x.costo,x.moneda)}</td><td class="r">${money(x.valorEstimado)}</td></tr>`).join('');
+  w.document.write(`<html><head><title>Compras Sugeridas</title><meta charset="utf-8"><style>body{font-family:Arial;font-size:11px;padding:24px;color:#111}h1{color:#e01f26;font-size:16px;margin:0}table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#111;color:#fff;padding:5px;text-align:left;font-size:9px}td{padding:4px 5px;border-bottom:1px solid #eee}td.r,th.r{text-align:right}td.c,th.c{text-align:center}.tot{font-size:14px;font-weight:800;text-align:right;margin-top:10px}@media print{body{padding:0}}</style></head><body>
+    <h1>${COMPANY.nombre}</h1><div>Compras sugeridas (reposición de stock) · ${fmtDate(new Date().toISOString().slice(0,10))}</div>
+    <table><thead><tr><th>Código</th><th>Producto</th><th>Marca</th><th class="c">Stock</th><th class="c">Disp.</th><th class="c">Mín.</th><th class="c">Sugerido</th><th class="r">Costo</th><th class="r">Inversión</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="tot">Unidades: ${totalUnid} · Inversión estimada: ${money(valor)}</div>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
 VIEWS.repinvvalorizado=(el)=>{
   const TC=tcActual();
   const list=DB.productos.filter(p=>Number(p.stock)>0).map(p=>{ const precioSol=p.moneda==='$'?(Number(p.precio)||0)*TC:(Number(p.precio)||0); return Object.assign({},p,{valor:precioSol*Number(p.stock)}); }).sort((a,b)=>b.valor-a.valor);
